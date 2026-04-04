@@ -5,32 +5,24 @@
   <title>Sentinel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&family=Doto:wght@100..900&display=swap" rel="stylesheet">
   <style>
     /* ── Tokens ── */
     :root {
       --black:           #000000;
-      --surface:         #111111;
-      --surface-raised:  #1A1A1A;
-      --border:          #222222;
-      --border-visible:  #333333;
-      --text-disabled:   #666666;
-      --text-secondary:  #999999;
-      --text-primary:    #E8E8E8;
+      --surface:         #0D0D0D;
+      --surface-raised:  #161616;
+      --border:          #1E1E1E;
+      --border-visible:  #2E2E2E;
+      --text-disabled:   #555555;
+      --text-secondary:  #888888;
+      --text-primary:    #E0E0E0;
       --text-display:    #FFFFFF;
       --accent:          #D71921;
       --success:         #4A9E5C;
       --warning:         #D4A843;
       --info:            #5B9BF6;
-
-      --idle-color:     var(--info);
-      --think-color:    #9B7FD4;
-      --work-color:     var(--warning);
-      --approval-color: var(--accent);
-      --success-color:  var(--success);
-
-      /* Auto-hide after 2 minutes of no activity */
-      --idle-timeout-ms: 120000;
+      --purple:          #9B7FD4;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,7 +33,6 @@
       font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
-      /* Allow dragging from anywhere not interactive */
       -webkit-app-region: drag;
     }
 
@@ -51,73 +42,34 @@
       display: flex;
       align-items: flex-start;
       justify-content: flex-start;
-      padding: 10px;
+      padding: 12px;
     }
 
-    /* ── Panel ── */
+    /* ── Outer panel ── */
     #panel {
       background: var(--black);
       border: 1px solid var(--border-visible);
-      border-radius: 14px;
+      border-radius: 16px;
       display: flex;
       flex-direction: column;
-      min-width: 160px;
-      overflow: hidden;
+      overflow: visible;
+      min-width: 100px;
     }
 
-    /* ── Panel header bar ── */
-    #panel-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    #panel-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-disabled);
-    }
-
-    #log-toggle {
-      -webkit-app-region: no-drag;
-      background: none;
-      border: 1px solid var(--border-visible);
-      border-radius: 4px;
-      color: var(--text-disabled);
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 3px 7px;
-      cursor: pointer;
-      transition: border-color 150ms ease-out, color 150ms ease-out;
-    }
-    #log-toggle:hover { border-color: var(--text-secondary); color: var(--text-secondary); }
-    #log-toggle.active { border-color: var(--text-primary); color: var(--text-primary); }
-
-    /* ── Body: cards + log ── */
-    #panel-body {
-      display: flex;
-      align-items: stretch;
-    }
-
-    /* ── Agents ── */
+    /* ── Agent cards row ── */
     #agents-area {
       display: flex;
       flex-direction: row;
-      gap: 0;
+      align-items: stretch;
     }
 
-    /* Agent wrapper — handles show/hide */
+    /* ── Agent wrapper — handles show/hide animation ── */
     .agent-wrap {
       opacity: 1;
-      max-width: 200px;
+      max-width: 220px;
       overflow: hidden;
-      transition: opacity 400ms ease-out, max-width 400ms ease-out;
+      transition: opacity 500ms cubic-bezier(0.25,0.1,0.25,1),
+                  max-width 500ms cubic-bezier(0.25,0.1,0.25,1);
     }
     .agent-wrap.hidden {
       opacity: 0;
@@ -126,92 +78,125 @@
 
     /* ── Agent Card ── */
     .agent-card {
-      width: 156px;
-      padding: 14px 14px 12px;
-      border-right: 1px solid var(--border);
+      width: 180px;
+      padding: 18px 16px 14px;
+      border-right: 1px solid var(--border-visible);
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 0;
       -webkit-app-region: no-drag;
       position: relative;
     }
-
-    /* Top row: dot + name */
-    .card-top {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* Remove right border from last visible card */
+    .agent-wrap:last-child .agent-card,
+    .agent-wrap.last-visible .agent-card {
+      border-right: none;
     }
 
-    .status-dot {
+    /* ── Mascot area ── */
+    .mascot-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .mascot-glyph {
+      font-size: 32px;
+      line-height: 1;
+      /* No emoji, use Doto dot-matrix letter as mascot */
+      font-family: 'Doto', monospace;
+      font-weight: 700;
+      color: var(--text-display);
+      letter-spacing: -0.04em;
+      transition: color 300ms ease-out;
+    }
+
+    .status-pip-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+    }
+
+    .status-pip {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      flex-shrink: 0;
       background: var(--text-disabled);
       transition: background 300ms ease-out, box-shadow 300ms ease-out;
     }
 
+    /* ── Name ── */
     .agent-name {
       font-family: 'Space Mono', monospace;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.09em;
       text-transform: uppercase;
-      color: var(--text-secondary);
+      color: var(--text-primary);
+      margin-bottom: 3px;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
     }
 
-    /* Status label */
+    /* ── Status label ── */
     .status-label {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-disabled);
+      margin-bottom: 10px;
       transition: color 300ms ease-out;
     }
 
-    /* Task text */
+    /* ── Task text ── */
     .task-text {
       font-size: 12px;
       font-weight: 400;
-      color: var(--text-primary);
-      line-height: 1.45;
+      color: var(--text-secondary);
+      line-height: 1.5;
       word-break: break-word;
-      min-height: 17px;
+      min-height: 18px;
     }
 
-    /* ── Dot colors per status ── */
-    .s-idle     .status-dot { background: var(--idle-color);     box-shadow: 0 0 6px var(--idle-color); }
-    .s-thinking .status-dot { background: var(--think-color);    box-shadow: 0 0 6px var(--think-color); animation: blink 1.4s ease-in-out infinite; }
-    .s-working  .status-dot { background: var(--work-color);     box-shadow: 0 0 6px var(--work-color);  animation: blink 0.7s ease-in-out infinite; }
-    .s-approval .status-dot { background: var(--approval-color); box-shadow: 0 0 8px var(--approval-color); animation: blink 0.35s ease-in-out infinite; }
-    .s-success  .status-dot { background: var(--success-color);  box-shadow: 0 0 8px var(--success-color); }
-    .s-error    .status-dot,
-    .s-warning  .status-dot { background: var(--warning);        box-shadow: 0 0 6px var(--warning); }
+    /* ── Per-status theming ── */
+    .s-idle     .status-pip { background: var(--text-disabled); box-shadow: none; }
+    .s-thinking .status-pip { background: var(--purple);        box-shadow: 0 0 6px var(--purple);   animation: blink 1.4s ease-in-out infinite; }
+    .s-working  .status-pip { background: var(--warning);       box-shadow: 0 0 6px var(--warning);  animation: blink 0.7s ease-in-out infinite; }
+    .s-approval .status-pip { background: var(--accent);        box-shadow: 0 0 8px var(--accent);   animation: blink 0.35s ease-in-out infinite; }
+    .s-success  .status-pip { background: var(--success);       box-shadow: 0 0 8px var(--success); }
+    .s-error    .status-pip,
+    .s-warning  .status-pip { background: var(--warning);       box-shadow: 0 0 6px var(--warning); }
 
-    .s-idle     .status-label { color: var(--idle-color); }
-    .s-thinking .status-label { color: var(--think-color); }
-    .s-working  .status-label { color: var(--work-color); }
-    .s-approval .status-label { color: var(--approval-color); }
-    .s-success  .status-label { color: var(--success-color); }
+    .s-idle     .status-label { color: var(--text-disabled); }
+    .s-thinking .status-label { color: var(--purple); }
+    .s-working  .status-label { color: var(--warning); }
+    .s-approval .status-label { color: var(--accent); }
+    .s-success  .status-label { color: var(--success); }
     .s-error    .status-label,
     .s-warning  .status-label { color: var(--warning); }
 
-    /* Approval card left border */
+    .s-thinking .mascot-glyph { color: var(--purple); }
+    .s-working  .mascot-glyph { color: var(--warning); }
+    .s-approval .mascot-glyph { color: var(--accent); }
+    .s-success  .mascot-glyph { color: var(--success); }
+
+    /* Approval card: left accent border */
     .s-approval .agent-card {
-      border-left: 2px solid var(--approval-color);
+      border-left: 2px solid var(--accent);
+      padding-left: 14px;
     }
 
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
 
     /* ── Approval controls ── */
     .controls {
       display: none;
       gap: 6px;
+      margin-top: 10px;
     }
     .s-approval .controls { display: flex; }
 
@@ -222,14 +207,14 @@
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      padding: 6px 0;
-      border-radius: 4px;
+      padding: 7px 0;
+      border-radius: 999px;
       cursor: pointer;
       transition: opacity 150ms ease-out;
       -webkit-app-region: no-drag;
     }
-    .btn:hover { opacity: 0.75; }
-    .btn:active { opacity: 0.55; }
+    .btn:hover  { opacity: 0.7; }
+    .btn:active { opacity: 0.45; }
     .btn-approve {
       background: transparent;
       border: 1px solid var(--success);
@@ -241,73 +226,106 @@
       color: var(--accent);
     }
 
-    /* ── Log panel ── */
-    #log-panel {
+    /* ── Footer bar: SENTINEL label + LOG button ── */
+    #footer-bar {
       display: flex;
-      flex-direction: column;
-      max-width: 0;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      border-top: 1px solid var(--border);
+      -webkit-app-region: drag;
+    }
+
+    #panel-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+    }
+
+    #log-toggle {
+      -webkit-app-region: no-drag;
+      background: transparent;
+      border: 1px solid var(--border-visible);
+      border-radius: 4px;
+      color: var(--text-disabled);
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: border-color 150ms ease-out, color 150ms ease-out;
+    }
+    #log-toggle:hover  { border-color: var(--text-secondary); color: var(--text-secondary); }
+    #log-toggle.active { border-color: var(--text-primary);   color: var(--text-primary); }
+
+    /* ── Log panel — slides down below cards ── */
+    #log-panel {
+      max-height: 0;
       overflow: hidden;
       opacity: 0;
-      transition: max-width 300ms ease-out, opacity 250ms ease-out;
+      transition: max-height 300ms cubic-bezier(0.25,0.1,0.25,1),
+                  opacity    250ms cubic-bezier(0.25,0.1,0.25,1);
     }
     #log-panel.open {
-      max-width: 280px;
+      max-height: 240px;
       opacity: 1;
     }
 
     #log-inner {
-      width: 260px;
-      padding: 12px;
-      border-left: 1px solid var(--border);
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 0;
     }
 
     .log-header {
       font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 0.12em;
+      font-size: 8px;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       color: var(--text-disabled);
-      padding-bottom: 6px;
+      padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
     }
 
     #log-feed {
-      max-height: 220px;
+      max-height: 170px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 2px;
     }
     #log-feed::-webkit-scrollbar { width: 2px; }
     #log-feed::-webkit-scrollbar-track { background: transparent; }
-    #log-feed::-webkit-scrollbar-thumb { background: var(--border-visible); }
+    #log-feed::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 1px; }
 
     .log-row {
       display: flex;
       align-items: baseline;
       gap: 6px;
-      padding: 4px 0;
+      padding: 5px 0;
       border-bottom: 1px solid var(--border);
     }
     .log-row:last-child { border-bottom: none; }
 
-    .log-indicator {
+    .log-dot {
       width: 4px;
       height: 4px;
       border-radius: 50%;
       flex-shrink: 0;
-      margin-top: 4px;
+      margin-top: 5px;
       background: var(--text-disabled);
     }
-    .log-row.ls-success  .log-indicator { background: var(--success); }
-    .log-row.ls-working  .log-indicator { background: var(--warning); }
-    .log-row.ls-thinking .log-indicator { background: var(--think-color); }
-    .log-row.ls-needs_approval .log-indicator { background: var(--accent); }
-    .log-row.ls-error,
-    .log-row.ls-warning  .log-indicator { background: var(--accent); }
+    .log-row.ls-success          .log-dot { background: var(--success); }
+    .log-row.ls-working          .log-dot { background: var(--warning); }
+    .log-row.ls-thinking         .log-dot { background: var(--purple); }
+    .log-row.ls-needs_approval   .log-dot { background: var(--accent); }
+    .log-row.ls-error            .log-dot,
+    .log-row.ls-warning          .log-dot { background: var(--accent); }
 
     .log-text {
       flex: 1;
@@ -324,21 +342,32 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
+
+    /* ── Empty state ── */
+    #empty-state {
+      display: none;
+      padding: 20px 24px 6px;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+    }
   </style>
 </head>
 <body>
   <div id="panel">
-    <div id="panel-header">
+    <div id="agents-area">
+      <div id="empty-state">No agents</div>
+    </div>
+    <div id="footer-bar">
       <span id="panel-title">Sentinel</span>
       <button id="log-toggle" onclick="toggleLog()">Log</button>
     </div>
-    <div id="panel-body">
-      <div id="agents-area"></div>
-      <div id="log-panel">
-        <div id="log-inner">
-          <div class="log-header">Activity</div>
-          <div id="log-feed"></div>
-        </div>
+    <div id="log-panel">
+      <div id="log-inner">
+        <div class="log-header">Activity</div>
+        <div id="log-feed"></div>
       </div>
     </div>
   </div>
@@ -350,6 +379,16 @@
     let lastHistory  = '';
     let eventSource  = null;
     let hideTimers   = {};
+
+    // Mascot glyphs per agent id/name (Doto dot-matrix letters)
+    function mascotGlyph(id, name) {
+      const n = (name || id || '').toUpperCase();
+      if (n.startsWith('GEMINI') || n === 'MAIN') return 'G';
+      if (n.startsWith('CLAUDE'))                  return 'C';
+      if (n.startsWith('GPT') || n.startsWith('OPENAI')) return 'O';
+      // First letter of the name as fallback
+      return n.charAt(0) || '?';
+    }
 
     function toggleLog() {
       const panel = document.getElementById('log-panel');
@@ -386,7 +425,7 @@
 
     function scheduleHide(id, timestamp) {
       if (hideTimers[id]) clearTimeout(hideTimers[id]);
-      const age = Date.now() - timestamp;
+      const age       = Date.now() - timestamp;
       const remaining = IDLE_TIMEOUT - age;
       if (remaining <= 0) {
         hideCard(id);
@@ -398,12 +437,31 @@
     function hideCard(id) {
       const wrap = document.querySelector(`[data-session-id="${id}"]`);
       if (wrap) wrap.classList.add('hidden');
+      updateEmptyState();
+      updateLastVisible();
     }
 
     function showCard(id) {
       if (hideTimers[id]) clearTimeout(hideTimers[id]);
       const wrap = document.querySelector(`[data-session-id="${id}"]`);
       if (wrap) wrap.classList.remove('hidden');
+      updateEmptyState();
+      updateLastVisible();
+    }
+
+    // Remove right border from last visible card
+    function updateLastVisible() {
+      const area  = document.getElementById('agents-area');
+      const wraps = [...area.querySelectorAll('.agent-wrap:not(.hidden)')];
+      area.querySelectorAll('.agent-wrap').forEach(w => w.classList.remove('last-visible'));
+      if (wraps.length > 0) wraps[wraps.length - 1].classList.add('last-visible');
+    }
+
+    function updateEmptyState() {
+      const area    = document.getElementById('agents-area');
+      const visible = area.querySelectorAll('.agent-wrap:not(.hidden)');
+      const empty   = document.getElementById('empty-state');
+      empty.style.display = visible.length === 0 ? 'block' : 'none';
     }
 
     function makeCard(s) {
@@ -414,15 +472,26 @@
       const card = document.createElement('div');
       card.className = 'agent-card';
 
-      // Top: dot + name
-      const top = document.createElement('div');
-      top.className = 'card-top';
-      const dot = document.createElement('div');
-      dot.className = 'status-dot';
+      // Mascot row: big Doto glyph + status pip
+      const mascotRow = document.createElement('div');
+      mascotRow.className = 'mascot-row';
+
+      const glyph = document.createElement('div');
+      glyph.className = 'mascot-glyph';
+      glyph.textContent = mascotGlyph(s.id, s.name);
+
+      const pipWrap = document.createElement('div');
+      pipWrap.className = 'status-pip-wrap';
+      const pip = document.createElement('div');
+      pip.className = 'status-pip';
+      pipWrap.appendChild(pip);
+
+      mascotRow.appendChild(glyph);
+      mascotRow.appendChild(pipWrap);
+
+      // Name
       const name = document.createElement('div');
       name.className = 'agent-name';
-      top.appendChild(dot);
-      top.appendChild(name);
 
       // Status label
       const label = document.createElement('div');
@@ -446,7 +515,8 @@
       controls.appendChild(approve);
       controls.appendChild(deny);
 
-      card.appendChild(top);
+      card.appendChild(mascotRow);
+      card.appendChild(name);
       card.appendChild(label);
       card.appendChild(task);
       card.appendChild(controls);
@@ -458,6 +528,7 @@
       const area = document.getElementById('agents-area');
       const ids  = new Set(Object.keys(sessions));
 
+      // Remove stale cards
       area.querySelectorAll('[data-session-id]').forEach(el => {
         if (!ids.has(el.dataset.sessionId)) el.remove();
       });
@@ -469,23 +540,26 @@
           area.appendChild(wrap);
         }
 
-        // Update class
-        wrap.className = `agent-wrap ${statusClass(s.status)}`;
+        // Update status class (keep hidden class if set)
+        const hidden = wrap.classList.contains('hidden');
+        wrap.className = `agent-wrap ${statusClass(s.status)}${hidden ? ' hidden' : ''}`;
 
         // Update content
-        wrap.querySelector('.agent-name').textContent  = s.name || s.id;
+        const glyph = wrap.querySelector('.mascot-glyph');
+        if (glyph) glyph.textContent = mascotGlyph(s.id, s.name);
+        wrap.querySelector('.agent-name').textContent   = s.name || s.id;
         wrap.querySelector('.status-label').textContent = statusLabel(s.status);
-        wrap.querySelector('.task-text').textContent    = s.status === 'idle' ? '' : s.task;
+        wrap.querySelector('.task-text').textContent    = (s.status === 'idle') ? '' : (s.task || '');
 
-        // Show card on any activity, then re-schedule hide from idle
         if (s.status === 'idle') {
-          // Start hide timer from last activity
           scheduleHide(s.id, s.timestamp || Date.now());
         } else {
-          // Active — always visible, cancel any pending hide
           showCard(s.id);
         }
       });
+
+      updateEmptyState();
+      updateLastVisible();
     }
 
     function renderHistory(history) {
@@ -495,21 +569,21 @@
         const row = document.createElement('div');
         row.className = `log-row ls-${h.status}`;
 
-        const ind = document.createElement('div');
-        ind.className = 'log-indicator';
+        const dot = document.createElement('div');
+        dot.className = 'log-dot';
 
         const text = document.createElement('div');
         text.className = 'log-text';
         const strong = document.createElement('strong');
         strong.textContent = (h.name || h.id) + ' ';
         text.appendChild(strong);
-        text.appendChild(document.createTextNode(h.task));
+        text.appendChild(document.createTextNode(h.task || ''));
 
         const time = document.createElement('div');
         time.className = 'log-time';
-        time.textContent = h.time;
+        time.textContent = h.time || '';
 
-        row.appendChild(ind);
+        row.appendChild(dot);
         row.appendChild(text);
         row.appendChild(time);
         feed.appendChild(row);
