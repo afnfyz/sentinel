@@ -15,7 +15,7 @@
       overflow: hidden;
       font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      -webkit-app-region: drag;
+      /* body is NOT a drag region — mascots use a drag handle */
     }
 
     button { -webkit-app-region: no-drag; }
@@ -35,7 +35,6 @@
       align-items: center;
       gap: 6px;
       position: relative;
-      -webkit-app-region: no-drag;
       opacity: 1;
       transition: opacity 500ms ease-out;
     }
@@ -44,7 +43,7 @@
       pointer-events: none;
     }
 
-    /* ── The clickable mascot figure ── */
+    /* ── The clickable mascot figure — no-drag so clicks work ── */
     .mascot-figure {
       cursor: pointer;
       position: relative;
@@ -53,6 +52,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      -webkit-app-region: no-drag;
+    }
+
+    /* ── Drag handle: the label under each mascot ── */
+    .mascot-label {
+      -webkit-app-region: drag;
+      cursor: move;
     }
 
     /* ── SVG mascot body ── */
@@ -138,7 +144,7 @@
       100% { transform: translateY(3px) rotate(-5deg); }
     }
 
-    /* ── Status name tag under mascot ── */
+    /* ── Status name tag under mascot (also the drag handle) ── */
     .mascot-label {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
@@ -149,6 +155,10 @@
       text-align: center;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8);
       white-space: nowrap;
+      padding: 4px 8px;
+      -webkit-app-region: drag;
+      cursor: move;
+      user-select: none;
     }
 
     /* ── Status indicator ring around mascot ── */
@@ -208,15 +218,12 @@
       color: #FF6B6B;
     }
 
-    /* ── Log popover ── */
-    .log-popover {
-      position: absolute;
-      bottom: calc(100% + 10px);
-      left: 50%;
-      transform: translateX(-50%) scale(0.95);
+    /* ── Log popover — fixed positioned via JS so it never clips ── */
+    #log-popover {
+      position: fixed;
       width: 260px;
-      background: rgba(10,10,10,0.92);
-      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(10,10,10,0.94);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 14px;
       overflow: hidden;
       opacity: 0;
@@ -224,20 +231,15 @@
       transition: opacity 200ms ease-out, transform 200ms ease-out;
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+      transform: scale(0.95);
+      transform-origin: bottom left;
+      z-index: 9999;
     }
-    .log-popover.open {
+    #log-popover.open {
       opacity: 1;
       pointer-events: auto;
-      transform: translateX(-50%) scale(1);
-    }
-    /* Keep popover on-screen if mascot is near left edge */
-    .mascot-slot:first-child .log-popover {
-      left: 0;
-      transform: translateX(0) scale(0.95);
-    }
-    .mascot-slot:first-child .log-popover.open {
-      transform: translateX(0) scale(1);
+      transform: scale(1);
     }
 
     .popover-header {
@@ -323,6 +325,15 @@
 </head>
 <body>
   <div id="mascots-area"></div>
+
+  <!-- Single shared log popover, positioned by JS -->
+  <div id="log-popover">
+    <div class="popover-header">
+      <span class="popover-title"></span>
+      <span class="popover-task"></span>
+    </div>
+    <div id="log-feed" class="log-feed"></div>
+  </div>
 
   <script>
     const IDLE_TIMEOUT = 120000; // 2 min
@@ -413,21 +424,14 @@
               <button class="abtn abtn-approve">OK</button>
               <button class="abtn abtn-deny">No</button>
             </div>
-            <div class="log-popover">
-              <div class="popover-header">
-                <span class="popover-title">${(s.name || s.id).toUpperCase()}</span>
-                <span class="popover-task"></span>
-              </div>
-              <div class="log-feed"></div>
-            </div>
           </div>
           <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
         `;
         // Approval button handlers
         slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
         slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
-        // Click mascot to toggle log
-        slot.querySelector('.mascot-figure').onclick = (e) => { toggleLog(s.id); };
+        // Click mascot figure to toggle log
+        slot.querySelector('.mascot-figure').onclick = (e) => { toggleLog(s.id, slot); };
         area.appendChild(slot);
       }
       return slot;
@@ -454,8 +458,8 @@
         showSlot(s.id);
       }
 
-      // If log is open for this agent, refresh its log feed
-      if (openLog === s.id) renderLogFeed(slot, s.id);
+      // If log is open, refresh its feed
+      if (openLog === s.id) renderLogFeed();
     }
 
     function statusClass(st) {
@@ -464,32 +468,59 @@
                error:'s-error', warning:'s-warning' }[st] || 's-idle';
     }
 
-    // ── Log popover ───────────────────────────────────────────────────────
-    function toggleLog(id) {
+    // ── Log popover (single shared, fixed-positioned) ─────────────────────
+    function toggleLog(id, slot) {
       if (openLog === id) {
         closeLog();
-      } else {
-        if (openLog) closeLog();
-        openLog = id;
-        const slot = document.querySelector(`[data-id="${id}"]`);
-        if (slot) {
-          renderLogFeed(slot, id);
-          slot.querySelector('.log-popover').classList.add('open');
-        }
+        return;
       }
+      if (openLog) closeLog();
+      openLog = id;
+
+      const popover = document.getElementById('log-popover');
+      // Position above the mascot figure
+      const fig = slot.querySelector('.mascot-figure');
+      const rect = fig.getBoundingClientRect();
+      const pw = 260;
+      const margin = 10;
+
+      // Horizontal: center on mascot, clamp to viewport
+      let left = rect.left + rect.width / 2 - pw / 2;
+      left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
+
+      // Vertical: above the mascot
+      let bottom = window.innerHeight - rect.top + 8;
+
+      popover.style.left   = left + 'px';
+      popover.style.bottom = bottom + 'px';
+      popover.style.top    = 'auto';
+      popover.style.transformOrigin = 'bottom center';
+
+      // If popover would go above viewport, flip below
+      const popoverHeight = 280;
+      if (rect.top - popoverHeight - 8 < 0) {
+        popover.style.bottom = 'auto';
+        popover.style.top    = (rect.bottom + 8) + 'px';
+        popover.style.transformOrigin = 'top center';
+      }
+
+      // Update header
+      const s = sessions[id] || {};
+      popover.querySelector('.popover-title').textContent = (s.name || id).toUpperCase();
+      popover.querySelector('.popover-task').textContent  = (s.status !== 'idle' && s.task) ? s.task : '';
+
+      renderLogFeed();
+      popover.classList.add('open');
     }
 
     function closeLog() {
-      if (!openLog) return;
-      const slot = document.querySelector(`[data-id="${openLog}"]`);
-      if (slot) slot.querySelector('.log-popover').classList.remove('open');
+      document.getElementById('log-popover').classList.remove('open');
       openLog = null;
     }
 
-    function renderLogFeed(slot, id) {
-      const feed = slot.querySelector('.log-feed');
-      // Show all history (global — could filter by name later)
-      const entries = history.slice(-30).reverse(); // newest first
+    function renderLogFeed() {
+      const feed = document.getElementById('log-feed');
+      const entries = history.slice(-40).reverse();
       if (!entries.length) {
         feed.innerHTML = '<div class="log-empty">No activity yet</div>';
         return;
@@ -572,9 +603,12 @@
       });
     }
 
-    // Close log when clicking outside
+    // Close log when clicking outside mascot and popover
     document.addEventListener('click', (e) => {
-      if (openLog && !e.target.closest(`[data-id="${openLog}"]`)) {
+      if (!openLog) return;
+      const slot    = document.querySelector(`[data-id="${openLog}"]`);
+      const popover = document.getElementById('log-popover');
+      if (!e.target.closest(`[data-id="${openLog}"]`) && !e.target.closest('#log-popover')) {
         closeLog();
       }
     });
