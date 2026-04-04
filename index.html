@@ -15,10 +15,11 @@
       overflow: hidden;
       font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      /* body is NOT a drag region — mascots use a drag handle */
+      /* Entire body is draggable — interactive children override with no-drag */
+      -webkit-app-region: drag;
     }
 
-    button { -webkit-app-region: no-drag; }
+    button, .mascot-label { -webkit-app-region: no-drag; }
 
     body {
       display: flex;
@@ -43,7 +44,7 @@
       pointer-events: none;
     }
 
-    /* ── The mascot figure — drag region, click handled via JS ── */
+    /* ── The mascot figure — inherits drag from body, click via JS ── */
     .mascot-figure {
       cursor: grab;
       position: relative;
@@ -52,7 +53,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      -webkit-app-region: drag;
+      /* No -webkit-app-region here — body handles it */
     }
     .mascot-figure:active { cursor: grabbing; }
 
@@ -152,7 +153,6 @@
       white-space: nowrap;
       padding: 2px 0;
       user-select: none;
-      -webkit-app-region: no-drag;
     }
 
     /* ── Status indicator ring around mascot ── */
@@ -198,7 +198,6 @@
       transition: opacity 150ms;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
-      -webkit-app-region: no-drag;
     }
     .abtn:hover  { opacity: 0.75; }
     .abtn:active { opacity: 0.5; }
@@ -422,18 +421,9 @@
           </div>
           <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
         `;
-        // Approval button handlers
+        // Approval button handlers — buttons are no-drag so onclick works normally
         slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
         slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
-        // Tap (not drag) on mascot figure toggles log
-        // WKWebView: drag region swallows click events, so detect via mousedown/mouseup distance
-        let mdX = 0, mdY = 0;
-        const fig = slot.querySelector('.mascot-figure');
-        fig.addEventListener('mousedown', (e) => { mdX = e.clientX; mdY = e.clientY; });
-        fig.addEventListener('mouseup',   (e) => {
-          const dist = Math.hypot(e.clientX - mdX, e.clientY - mdY);
-          if (dist < 6) toggleLog(s.id, slot);
-        });
         area.appendChild(slot);
       }
       return slot;
@@ -606,12 +596,26 @@
       });
     }
 
-    // Close log when clicking outside mascot and popover
-    document.addEventListener('click', (e) => {
-      if (!openLog) return;
-      const slot    = document.querySelector(`[data-id="${openLog}"]`);
-      const popover = document.getElementById('log-popover');
-      if (!e.target.closest(`[data-id="${openLog}"]`) && !e.target.closest('#log-popover')) {
+    // ── Body-level tap detection (drag region swallows click events) ──────
+    // mousedown/mouseup still fire even on drag regions in WKWebView
+    let tapDownX = 0, tapDownY = 0;
+    document.addEventListener('mousedown', (e) => {
+      tapDownX = e.clientX;
+      tapDownY = e.clientY;
+    });
+    document.addEventListener('mouseup', (e) => {
+      const dist = Math.hypot(e.clientX - tapDownX, e.clientY - tapDownY);
+      if (dist >= 6) return; // it was a drag, not a tap
+
+      // Hit-test: did the tap land inside a mascot figure?
+      const fig = e.target.closest('.mascot-figure');
+      if (fig) {
+        const slot = fig.closest('[data-id]');
+        if (slot) { toggleLog(slot.dataset.id, slot); return; }
+      }
+
+      // Tap outside mascot and popover → close log
+      if (openLog && !e.target.closest('#log-popover')) {
         closeLog();
       }
     });
