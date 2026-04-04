@@ -10,27 +10,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var window: SentinelWindow!
     var webView: WKWebView!
     var statusItem: NSStatusItem!
+    var serverProcess: Process?
+    var watchTimer: Timer?
+
+    let sentinelDir = "/Users/afnan_dfx/projects/gemini-sentinel"
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // 1. Create Menu Bar Icon (Prevents app from being killed easily)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.title = "♊️"
         }
 
-        // 2. Setup Window (Top-Right, Transparent, Always on Top)
         let width: CGFloat = 850
         let height: CGFloat = 400
-        
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
-        let rect = NSRect(x: screenRect.width - width - 20, 
-                        y: screenRect.height - height - 20, 
+        let rect = NSRect(x: screenRect.width - width - 20,
+                        y: screenRect.height - height - 20,
                         width: width, height: height)
 
         window = SentinelWindow(contentRect: rect,
                               styleMask: [.borderless],
                               backing: .buffered, defer: false)
-        
         window.level = .floating
         window.isOpaque = false
         window.backgroundColor = .clear
@@ -40,24 +40,59 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.alphaValue = 1.0
         window.hidesOnDeactivate = false
 
-        // 3. Setup WebView
         let config = WKWebViewConfiguration()
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
-        webView.setValue(false, forKey: "drawsBackground") // Transparent background
+        webView.setValue(false, forKey: "drawsBackground")
         webView.autoresizingMask = [.width, .height]
         window.contentView?.addSubview(webView)
-        
-        // 4. Load HTML
-        let path = "/Users/afnan_dfx/projects/gemini-sentinel/index.html"
+
+        let path = "\(sentinelDir)/index.html"
         let url = URL(fileURLWithPath: path)
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        
+
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Start server and watch it — restart if it goes down
+        startServerIfNeeded()
+        watchTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.startServerIfNeeded()
+        }
+    }
+
+    func isServerRunning() -> Bool {
+        let task = Process()
+        task.launchPath = "/usr/bin/curl"
+        task.arguments = ["-s", "--max-time", "1", "http://localhost:49152/state"]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        try? task.run()
+        task.waitUntilExit()
+        return task.terminationStatus == 0
+    }
+
+    func startServerIfNeeded() {
+        guard !isServerRunning() else { return }
+        print("[Sentinel] Server not running — starting...")
+        let process = Process()
+        process.launchPath = "/usr/bin/env"
+        process.arguments = ["node", "\(sentinelDir)/server.js"]
+        process.currentDirectoryURL = URL(fileURLWithPath: sentinelDir)
+        let logURL = URL(fileURLWithPath: "\(sentinelDir)/server.log")
+        let logHandle = try? FileHandle(forWritingTo: logURL)
+        process.standardOutput = logHandle ?? FileHandle.nullDevice
+        process.standardError = logHandle ?? FileHandle.nullDevice
+        try? process.run()
+        serverProcess = process
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+
+    func applicationWillTerminate(_ aNotification: Notification) {
+        watchTimer?.invalidate()
+        serverProcess?.terminate()
     }
 }
 
