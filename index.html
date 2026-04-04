@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Gemini Sentinel - Mission Control</title>
+  <title>Sentinel</title>
   <style>
     :root {
       --bg: rgba(18, 18, 18, 0.98);
       --card: rgba(45, 45, 45, 0.6);
       --idle: #3498db; --thinking: #9b59b6; --working: #f1c40f; --warning: #e74c3c; --success: #2ecc71;
-      --disconnected: #888;
     }
 
     body {
@@ -16,9 +15,6 @@
       font-family: -apple-system, sans-serif;
       display: flex; justify-content: center; align-items: flex-start;
       height: 100vh; background: transparent; overflow: hidden;
-    }
-    body.disconnected #sentinel-panel {
-      border-color: rgba(255,255,255,0.05);
     }
 
     #sentinel-panel {
@@ -29,107 +25,152 @@
       display: flex; gap: 0;
       box-shadow: 0 30px 60px rgba(0,0,0,0.7);
       border: 1px solid rgba(255,255,255,0.15);
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
-      min-width: 220px;
+      align-items: flex-start;
     }
 
-    #sentinel-panel.show-history {
-      width: 750px; gap: 20px; padding: 20px;
-    }
-
-    /* Active Agents Section */
     #agents-area {
-      display: flex; gap: 15px; flex-wrap: wrap; align-items: center;
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start;
     }
 
     .agent-card {
       background: var(--card);
       border-radius: 20px;
-      padding: 15px;
-      width: 170px;
+      padding: 14px 14px 12px;
+      width: 160px;
       display: flex; flex-direction: column; align-items: center;
       border: 1px solid rgba(255,255,255,0.05);
-      position: relative;
+      box-sizing: border-box;
+    }
+
+    /* Pulse border on approval */
+    .status-needs_approval.agent-card {
+      border-color: var(--warning);
+      box-shadow: 0 0 0 0 rgba(231,76,60,0.6);
+      animation: border-pulse 1s infinite;
+    }
+
+    @keyframes border-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(231,76,60,0.6); }
+      70%  { box-shadow: 0 0 0 8px rgba(231,76,60,0); }
+      100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); }
     }
 
     .mascot {
-      width: 48px; height: 48px; border-radius: 14px;
-      margin-bottom: 12px; background: var(--idle);
-      position: relative;
+      width: 44px; height: 44px; border-radius: 13px;
+      margin-bottom: 10px; background: var(--idle);
+      position: relative; flex-shrink: 0;
     }
-
     .mascot::before, .mascot::after {
-      content: ''; width: 6px; height: 6px; background: #000;
-      border-radius: 50%; position: absolute; top: 12px;
+      content: ''; width: 5px; height: 5px; background: rgba(0,0,0,0.7);
+      border-radius: 50%; position: absolute; top: 11px;
     }
-    .mascot::before { left: 14px; } .mascot::after { right: 14px; }
+    .mascot::before { left: 12px; } .mascot::after { right: 12px; }
 
-    .name { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 900; letter-spacing: 1px; }
-    .task { font-size: 11px; color: #eee; text-align: center; min-height: 36px; margin-top: 8px; line-height: 1.4; }
+    .name {
+      font-size: 9px; text-transform: uppercase; color: #777;
+      font-weight: 900; letter-spacing: 1.5px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      width: 100%; text-align: center;
+    }
 
-    /* History Toggle Button */
+    .task {
+      font-size: 11px; color: #ddd; text-align: center;
+      margin-top: 7px; line-height: 1.4;
+      word-break: break-word; width: 100%;
+      min-height: 30px;
+    }
+
+    /* History toggle */
     #toggle-history {
-      background: rgba(255,255,255,0.1);
-      border: none; color: #666; width: 30px; height: 30px;
-      border-radius: 50%; cursor: pointer; display: flex; 
-      align-items: center; justify-content: center; font-size: 14px;
-      margin-left: 10px; transition: 0.2s;
+      background: rgba(255,255,255,0.08);
+      border: none; color: #555; width: 28px; height: 28px;
+      border-radius: 50%; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; font-size: 13px;
+      margin-left: 8px; flex-shrink: 0; align-self: center;
+      transition: 0.2s;
     }
-    #toggle-history:hover { background: rgba(255,255,255,0.2); color: #fff; }
+    #toggle-history:hover { background: rgba(255,255,255,0.18); color: #fff; }
 
-    /* Mission Control Section */
+    /* Log panel — animated with max-width so transition works */
     #log-panel {
-      display: none; flex: 1; border-left: 1px solid rgba(255,255,255,0.1);
-      padding-left: 20px; flex-direction: column; opacity: 0;
-      transition: opacity 0.3s;
+      display: flex;
+      flex-direction: column;
+      max-width: 0; overflow: hidden;
+      opacity: 0; visibility: hidden;
+      transition: max-width 0.35s ease, opacity 0.3s ease, padding-left 0.35s ease;
+      padding-left: 0;
+      border-left: 1px solid transparent;
     }
-
     #sentinel-panel.show-history #log-panel {
-      display: flex; opacity: 1;
+      max-width: 320px; opacity: 1; visibility: visible;
+      padding-left: 18px;
+      border-left-color: rgba(255,255,255,0.1);
     }
 
     #log-panel h3 {
-      font-size: 10px; text-transform: uppercase; color: #555;
-      margin: 0 0 12px 0; letter-spacing: 2px;
+      font-size: 9px; text-transform: uppercase; color: #444;
+      margin: 0 0 10px 0; letter-spacing: 2px; white-space: nowrap;
     }
 
     #log-feed {
-      overflow-y: auto; height: 300px; display: flex; flex-direction: column; gap: 8px;
+      overflow-y: auto; max-height: 280px;
+      display: flex; flex-direction: column; gap: 6px;
+      width: 280px;
     }
 
     .log-entry {
-      font-size: 10.5px; line-height: 1.3; color: #999;
-      padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);
-      animation: slideIn 0.3s ease-out;
+      font-size: 10px; line-height: 1.4; color: #888;
+      padding: 5px 0 5px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-left: 2px solid transparent;
+      animation: slideIn 0.25s ease-out;
     }
-    .log-entry strong { color: #ccc; }
-    .log-entry .time { color: #444; font-size: 9px; float: right; }
+    .log-entry strong { color: #bbb; }
+    .log-entry .time { color: #3a3a3a; font-size: 9px; float: right; margin-left: 6px; }
 
-    /* Mascot Animations */
-    .status-thinking .mascot { background: var(--thinking); box-shadow: 0 0 20px var(--thinking); animation: pulse 2s infinite; }
-    .status-working .mascot { background: var(--working); box-shadow: 0 0 20px var(--working); animation: pulse 1s infinite; }
-    .status-needs_approval .mascot { background: var(--warning); box-shadow: 0 0 30px var(--warning); animation: shake 0.2s infinite; }
-    .status-success .mascot { background: var(--success); transform: translateY(-5px); }
-    .status-idle .mascot { background: var(--idle); animation: breathe 3s infinite ease-in-out; }
-    .status-disconnected .mascot { background: var(--disconnected); animation: none; }
+    .log-entry.status-success       { border-left-color: var(--success); }
+    .log-entry.status-error,
+    .log-entry.status-warning,
+    .log-entry.status-needs_approval { border-left-color: var(--warning); }
+    .log-entry.status-thinking       { border-left-color: var(--thinking); }
+    .log-entry.status-working        { border-left-color: var(--working); }
 
-    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-    @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } }
-    @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } }
-    @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    /* Mascot status animations */
+    .status-idle .mascot            { background: var(--idle); animation: breathe 3s infinite ease-in-out; }
+    .status-thinking .mascot        { background: var(--thinking); box-shadow: 0 0 18px var(--thinking); animation: pulse 2s infinite; }
+    .status-working .mascot         { background: var(--working); box-shadow: 0 0 18px var(--working); animation: pulse 1s infinite; }
+    .status-needs_approval .mascot  { background: var(--warning); box-shadow: 0 0 24px var(--warning); animation: shake 0.15s infinite; }
+    .status-success .mascot         { background: var(--success); box-shadow: 0 0 14px var(--success); animation: pop 0.4s ease-out; }
+    .status-error .mascot,
+    .status-warning .mascot         { background: var(--warning); }
 
-    .controls { display: none; gap: 8px; margin-top: 10px; width: 100%; }
+    @keyframes pulse   { 0%,100% { transform: scale(1); }    50% { transform: scale(1.08); } }
+    @keyframes shake   { 0%,100% { transform: rotate(0); }   25% { transform: rotate(4deg); } 75% { transform: rotate(-4deg); } }
+    @keyframes breathe { 0%,100% { transform: scale(1); opacity:0.85; } 50% { transform: scale(1.04); opacity:1; } }
+    @keyframes pop     { 0% { transform: scale(0.9); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+    @keyframes slideIn { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+
+    /* Approval controls */
+    .controls { display: none; gap: 6px; margin-top: 10px; width: 100%; }
     .status-needs_approval .controls { display: flex; }
-    .btn-action { flex: 1; font-size: 10px; padding: 6px; border: none; border-radius: 8px; color: #fff; cursor: pointer; font-weight: 700; }
-    .approve { background: var(--success); } .deny { background: var(--warning); }
+    .btn-action {
+      flex: 1; font-size: 10px; padding: 7px 4px;
+      border: none; border-radius: 8px; color: #fff;
+      cursor: pointer; font-weight: 800; letter-spacing: 0.3px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn-action:hover  { opacity: 0.85; }
+    .btn-action:active { transform: scale(0.96); }
+    .approve { background: var(--success); }
+    .deny    { background: var(--warning); }
   </style>
 </head>
 <body>
   <div id="sentinel-panel">
     <div id="agents-area"></div>
-    <button id="toggle-history" title="Toggle History" onclick="toggleHistory()">📜</button>
+    <button id="toggle-history" title="Toggle log" onclick="toggleHistory()">📋</button>
     <div id="log-panel">
-      <h3>Mission Control</h3>
+      <h3>Activity Log</h3>
       <div id="log-feed"></div>
     </div>
   </div>
@@ -137,115 +178,101 @@
   <script>
     let lastHistory = '';
     let lastSessions = '';
-    let isConnected = true;
     let eventSource = null;
 
     function toggleHistory() {
-      const panel = document.getElementById('sentinel-panel');
-      panel.classList.toggle('show-history');
+      document.getElementById('sentinel-panel').classList.toggle('show-history');
     }
 
     function updateAgentCard(session) {
-        const agentsArea = document.getElementById('agents-area');
-        let card = document.querySelector(`#agents-area .agent-card[data-session-id="${session.id}"]`);
+      const agentsArea = document.getElementById('agents-area');
+      let card = agentsArea.querySelector(`.agent-card[data-session-id="${session.id}"]`);
 
-        if (!card) {
-            card = document.createElement('div');
-            card.className = `agent-card status-${session.status}`;
-            card.dataset.sessionId = session.id;
-            card.innerHTML = `
-                <div class="name">${session.name || session.id}</div>
-                <div class="mascot"></div>
-                <div class="task">${session.task}</div>
-                <div class="controls">
-                    <button class="btn-action approve" onclick="action('${session.id}', 'approve')">OK</button>
-                    <button class="btn-action deny" onclick="action('${session.id}', 'deny')">NO</button>
-                </div>
-            `;
-            agentsArea.appendChild(card);
-        } else {
-            card.className = `agent-card status-${session.status}`;
-            card.querySelector('.task').textContent = session.task;
-            card.querySelector('.name').textContent = session.name || session.id;
-        }
+      if (!card) {
+        card = document.createElement('div');
+        card.dataset.sessionId = session.id;
 
-        // Show/hide controls based on status
-        const controls = card.querySelector('.controls');
-        if (session.status === 'needs_approval') {
-            controls.style.display = 'flex';
-        } else {
-            controls.style.display = 'none';
-        }
+        const name = document.createElement('div');
+        name.className = 'name';
+
+        const mascot = document.createElement('div');
+        mascot.className = 'mascot';
+
+        const task = document.createElement('div');
+        task.className = 'task';
+
+        const controls = document.createElement('div');
+        controls.className = 'controls';
+
+        const approve = document.createElement('button');
+        approve.className = 'btn-action approve';
+        approve.textContent = 'Approve';
+        approve.onclick = () => action(session.id, 'approve');
+
+        const deny = document.createElement('button');
+        deny.className = 'btn-action deny';
+        deny.textContent = 'Deny';
+        deny.onclick = () => action(session.id, 'deny');
+
+        controls.appendChild(approve);
+        controls.appendChild(deny);
+        card.appendChild(name);
+        card.appendChild(mascot);
+        card.appendChild(task);
+        card.appendChild(controls);
+        card.className = `agent-card status-${session.status}`;
+        agentsArea.appendChild(card);
+      }
+
+      card.className = `agent-card status-${session.status}`;
+      card.querySelector('.name').textContent = session.name || session.id;
+      card.querySelector('.task').textContent = session.task;
     }
 
     function renderSessions(sessions) {
       const agentsArea = document.getElementById('agents-area');
-      const currentSessionIds = new Set(Object.keys(sessions));
-      
-      // Remove old cards that are no longer in sessions
-      agentsArea.querySelectorAll('.agent-card').forEach(card => {
-        if (!currentSessionIds.has(card.dataset.sessionId)) {
-          card.remove();
-        }
+      const ids = new Set(Object.keys(sessions));
+      agentsArea.querySelectorAll('.agent-card').forEach(c => {
+        if (!ids.has(c.dataset.sessionId)) c.remove();
       });
-
-      // Update or add new cards
-      Object.values(sessions).forEach(s => {
-        updateAgentCard(s);
-      });
+      Object.values(sessions).forEach(updateAgentCard);
     }
 
     function renderHistory(history) {
-      const logFeed = document.getElementById('log-feed');
-      logFeed.innerHTML = ''; // Clear previous logs
+      const feed = document.getElementById('log-feed');
+      feed.innerHTML = '';
       history.forEach(h => {
         const entry = document.createElement('div');
         entry.className = `log-entry status-${h.status}`;
-        entry.innerHTML = `
-          <span class="time">${h.time}</span>
-          <strong>${h.name}</strong> ${h.task}
-        `;
-        logFeed.appendChild(entry);
+        const time = document.createElement('span');
+        time.className = 'time';
+        time.textContent = h.time;
+        const strong = document.createElement('strong');
+        strong.textContent = h.name + ' ';
+        entry.appendChild(time);
+        entry.appendChild(strong);
+        entry.appendChild(document.createTextNode(h.task));
+        feed.appendChild(entry);
       });
     }
 
     function connectSSE() {
-      if (eventSource) {
-        eventSource.close();
-      }
+      if (eventSource) eventSource.close();
       eventSource = new EventSource('http://localhost:49152/stream');
 
       eventSource.addEventListener('update', (event) => {
         try {
-          const data = JSON.parse(event.data);
-          const { sessions, history } = data;
-
-          const sessionsChanged = JSON.stringify(sessions) !== lastSessions;
-          const historyChanged = JSON.stringify(history) !== lastHistory;
-
-          if (sessionsChanged) {
-            lastSessions = JSON.stringify(sessions);
-            renderSessions(sessions);
-          }
-          if (historyChanged) {
-            lastHistory = JSON.stringify(history);
-            renderHistory(history);
-          }
-          
-          if (!isConnected) {
-            isConnected = true;
-            document.body.classList.remove('disconnected');
-            console.log('[UI] Connected to server.');
-          }
-        } catch (e) {
-          console.error("SSE Error processing event:", e);
-        }
+          const { sessions, history } = JSON.parse(event.data);
+          const sStr = JSON.stringify(sessions);
+          const hStr = JSON.stringify(history);
+          if (sStr !== lastSessions) { lastSessions = sStr; renderSessions(sessions); }
+          if (hStr !== lastHistory)  { lastHistory  = hStr; renderHistory(history); }
+          document.body.classList.remove('disconnected');
+        } catch(e) {}
       });
 
       eventSource.onerror = () => {
-        isConnected = false;
         document.body.classList.add('disconnected');
-        console.error('[UI] SSE connection error. Retrying in 5s...');
         eventSource.close();
         setTimeout(connectSSE, 5000);
       };
@@ -259,7 +286,7 @@
       });
     }
 
-    connectSSE(); // Initial connection
+    connectSSE();
   </script>
 </body>
 </html>

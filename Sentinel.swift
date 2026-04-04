@@ -53,10 +53,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Start server and watch it — restart if it goes down
+        // Start server and watch it — restart if it goes down, poll for approvals
         startServerIfNeeded()
-        watchTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        watchTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             self?.startServerIfNeeded()
+            self?.checkForApproval()
         }
     }
 
@@ -84,6 +85,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         process.standardError = logHandle ?? FileHandle.nullDevice
         try? process.run()
         serverProcess = process
+    }
+
+    func checkForApproval() {
+        guard let url = URL(string: "http://localhost:49152/state") else { return }
+        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let sessions = json["sessions"] as? [String: Any] else { return }
+            let needsApproval = sessions.values.compactMap { $0 as? [String: Any] }
+                .contains { ($0["status"] as? String) == "needs_approval" }
+            if needsApproval {
+                DispatchQueue.main.async {
+                    self?.window.level = .screenSaver  // float above everything including VS Code
+                    self?.window.makeKeyAndOrderFront(nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self?.window.level = .floating
+                }
+            }
+        }.resume()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
