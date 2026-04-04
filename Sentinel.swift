@@ -21,11 +21,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.title = "♊️"
         }
 
-        let width: CGFloat = 850
-        let height: CGFloat = 400
+        let width: CGFloat = 400
+        let height: CGFloat = 200
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
-        let rect = NSRect(x: screenRect.width - width - 20,
-                        y: screenRect.height - height - 20,
+        let rect = NSRect(x: screenRect.minX + 20,
+                        y: screenRect.minY + 20,
                         width: width, height: height)
 
         window = SentinelWindow(contentRect: rect,

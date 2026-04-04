@@ -5,601 +5,557 @@
   <title>Sentinel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&family=Doto:wght@100..900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    /* ── Tokens ── */
-    :root {
-      --black:           #000000;
-      --surface:         #0D0D0D;
-      --surface-raised:  #161616;
-      --border:          #1E1E1E;
-      --border-visible:  #2E2E2E;
-      --text-disabled:   #555555;
-      --text-secondary:  #888888;
-      --text-primary:    #E0E0E0;
-      --text-display:    #FFFFFF;
-      --accent:          #D71921;
-      --success:         #4A9E5C;
-      --warning:         #D4A843;
-      --info:            #5B9BF6;
-      --purple:          #9B7FD4;
-    }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       width: 100%; height: 100%;
       background: transparent;
+      overflow: hidden;
       font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      overflow: hidden;
       -webkit-app-region: drag;
     }
 
-    button, a { -webkit-app-region: no-drag; }
+    button { -webkit-app-region: no-drag; }
 
     body {
       display: flex;
-      align-items: flex-start;
+      align-items: flex-end;
       justify-content: flex-start;
-      padding: 12px;
+      padding: 16px;
+      gap: 12px;
     }
 
-    /* ── Outer panel ── */
-    #panel {
-      background: var(--black);
-      border: 1px solid var(--border-visible);
-      border-radius: 16px;
+    /* ── Each mascot slot ── */
+    .mascot-slot {
       display: flex;
       flex-direction: column;
-      overflow: visible;
-      min-width: 100px;
-    }
-
-    /* ── Agent cards row ── */
-    #agents-area {
-      display: flex;
-      flex-direction: row;
-      align-items: stretch;
-    }
-
-    /* ── Agent wrapper — handles show/hide animation ── */
-    .agent-wrap {
-      opacity: 1;
-      max-width: 220px;
-      overflow: hidden;
-      transition: opacity 500ms cubic-bezier(0.25,0.1,0.25,1),
-                  max-width 500ms cubic-bezier(0.25,0.1,0.25,1);
-    }
-    .agent-wrap.hidden {
-      opacity: 0;
-      max-width: 0;
-    }
-
-    /* ── Agent Card ── */
-    .agent-card {
-      width: 180px;
-      padding: 18px 16px 14px;
-      border-right: 1px solid var(--border-visible);
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      -webkit-app-region: no-drag;
+      align-items: center;
+      gap: 6px;
       position: relative;
+      -webkit-app-region: no-drag;
+      opacity: 1;
+      transition: opacity 500ms ease-out;
     }
-    /* Remove right border from last visible card */
-    .agent-wrap:last-child .agent-card,
-    .agent-wrap.last-visible .agent-card {
-      border-right: none;
+    .mascot-slot.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
 
-    /* ── Mascot area ── */
-    .mascot-row {
+    /* ── The clickable mascot figure ── */
+    .mascot-figure {
+      cursor: pointer;
+      position: relative;
+      width: 56px;
+      height: 56px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
+      justify-content: center;
     }
 
-    .mascot-glyph {
-      font-size: 32px;
-      line-height: 1;
-      /* No emoji, use Doto dot-matrix letter as mascot */
-      font-family: 'Doto', monospace;
-      font-weight: 700;
-      color: var(--text-display);
-      letter-spacing: -0.04em;
-      transition: color 300ms ease-out;
+    /* ── SVG mascot body ── */
+    .mascot-svg {
+      width: 56px;
+      height: 56px;
+      overflow: visible;
     }
 
-    .status-pip-wrap {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
+    /* ── Idle: gentle float ── */
+    .mascot-slot.s-idle .mascot-body-group {
+      animation: float 3.2s ease-in-out infinite;
     }
 
-    .status-pip {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--text-disabled);
-      transition: background 300ms ease-out, box-shadow 300ms ease-out;
+    /* ── Thinking: slow bob + eyes moving ── */
+    .mascot-slot.s-thinking .mascot-body-group {
+      animation: thinking-bob 1.8s ease-in-out infinite;
+    }
+    .mascot-slot.s-thinking .eye-l,
+    .mascot-slot.s-thinking .eye-r {
+      animation: eyes-look 1.8s ease-in-out infinite;
     }
 
-    /* ── Name ── */
-    .agent-name {
-      font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.09em;
-      text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 3px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    /* ── Working: fast bounce ── */
+    .mascot-slot.s-working .mascot-body-group {
+      animation: working-bounce 0.55s cubic-bezier(0.36,0.07,0.19,0.97) infinite;
     }
 
-    /* ── Status label ── */
-    .status-label {
+    /* ── Approval: urgent shake ── */
+    .mascot-slot.s-approval .mascot-body-group {
+      animation: shake 0.4s ease-in-out infinite;
+    }
+
+    /* ── Success: happy jump ── */
+    .mascot-slot.s-success .mascot-body-group {
+      animation: jump 0.6s ease-out forwards;
+    }
+
+    /* ── Error/Warning: droop ── */
+    .mascot-slot.s-error .mascot-body-group,
+    .mascot-slot.s-warning .mascot-body-group {
+      animation: droop 0.5s ease-out forwards;
+    }
+
+    @keyframes float {
+      0%,100% { transform: translateY(0px); }
+      50%      { transform: translateY(-5px); }
+    }
+    @keyframes thinking-bob {
+      0%,100% { transform: translateY(0px) rotate(0deg); }
+      30%     { transform: translateY(-3px) rotate(-4deg); }
+      70%     { transform: translateY(-3px) rotate(4deg); }
+    }
+    @keyframes eyes-look {
+      0%,100% { transform: translateX(0); }
+      40%     { transform: translateX(-1.5px); }
+      80%     { transform: translateX(1.5px); }
+    }
+    @keyframes working-bounce {
+      0%,100% { transform: translateY(0px) scaleY(1) scaleX(1); }
+      20%     { transform: translateY(-8px) scaleY(1.1) scaleX(0.93); }
+      45%     { transform: translateY(0px) scaleY(0.88) scaleX(1.1); }
+      65%     { transform: translateY(-3px) scaleY(1.04) scaleX(0.97); }
+      80%     { transform: translateY(0px) scaleY(0.96) scaleX(1.03); }
+    }
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      20%     { transform: translateX(-4px) rotate(-3deg); }
+      40%     { transform: translateX(4px)  rotate(3deg); }
+      60%     { transform: translateX(-4px) rotate(-2deg); }
+      80%     { transform: translateX(3px)  rotate(2deg); }
+    }
+    @keyframes jump {
+      0%   { transform: translateY(0) scaleY(1); }
+      30%  { transform: translateY(-14px) scaleY(1.05); }
+      55%  { transform: translateY(0) scaleY(0.92) scaleX(1.08); }
+      70%  { transform: translateY(-5px) scaleY(1.02); }
+      85%  { transform: translateY(0) scaleY(0.97); }
+      100% { transform: translateY(0) scaleY(1); }
+    }
+    @keyframes droop {
+      0%   { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(3px) rotate(-5deg); }
+    }
+
+    /* ── Status name tag under mascot ── */
+    .mascot-label {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
+      font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--text-disabled);
-      margin-bottom: 10px;
-      transition: color 300ms ease-out;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      white-space: nowrap;
     }
 
-    /* ── Task text ── */
-    .task-text {
-      font-size: 12px;
-      font-weight: 400;
-      color: var(--text-secondary);
-      line-height: 1.5;
-      word-break: break-word;
-      min-height: 18px;
+    /* ── Status indicator ring around mascot ── */
+    .mascot-ring {
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      transition: border-color 400ms ease-out, box-shadow 400ms ease-out;
+      pointer-events: none;
+    }
+    .s-thinking .mascot-ring { border-color: rgba(155,127,212,0.5); box-shadow: 0 0 10px rgba(155,127,212,0.3); }
+    .s-working  .mascot-ring { border-color: rgba(212,168,67,0.6);  box-shadow: 0 0 10px rgba(212,168,67,0.3); animation: ring-spin 1s linear infinite; }
+    .s-approval .mascot-ring { border-color: rgba(215,25,33,0.7);   box-shadow: 0 0 14px rgba(215,25,33,0.4); }
+    .s-success  .mascot-ring { border-color: rgba(74,158,92,0.6);   box-shadow: 0 0 12px rgba(74,158,92,0.35); }
+
+    @keyframes ring-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
     }
 
-    /* ── Per-status theming ── */
-    .s-idle     .status-pip { background: var(--text-disabled); box-shadow: none; }
-    .s-thinking .status-pip { background: var(--purple);        box-shadow: 0 0 6px var(--purple);   animation: blink 1.4s ease-in-out infinite; }
-    .s-working  .status-pip { background: var(--warning);       box-shadow: 0 0 6px var(--warning);  animation: blink 0.7s ease-in-out infinite; }
-    .s-approval .status-pip { background: var(--accent);        box-shadow: 0 0 8px var(--accent);   animation: blink 0.35s ease-in-out infinite; }
-    .s-success  .status-pip { background: var(--success);       box-shadow: 0 0 8px var(--success); }
-    .s-error    .status-pip,
-    .s-warning  .status-pip { background: var(--warning);       box-shadow: 0 0 6px var(--warning); }
-
-    .s-idle     .status-label { color: var(--text-disabled); }
-    .s-thinking .status-label { color: var(--purple); }
-    .s-working  .status-label { color: var(--warning); }
-    .s-approval .status-label { color: var(--accent); }
-    .s-success  .status-label { color: var(--success); }
-    .s-error    .status-label,
-    .s-warning  .status-label { color: var(--warning); }
-
-    .s-thinking .mascot-glyph { color: var(--purple); }
-    .s-working  .mascot-glyph { color: var(--warning); }
-    .s-approval .mascot-glyph { color: var(--accent); }
-    .s-success  .mascot-glyph { color: var(--success); }
-
-    /* Approval card: left accent border */
-    .s-approval .agent-card {
-      border-left: 2px solid var(--accent);
-      padding-left: 14px;
-    }
-
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.25} }
-
-    /* ── Approval controls ── */
-    .controls {
+    /* ── Approval buttons (show on hover when needs_approval) ── */
+    .approval-btns {
       display: none;
-      gap: 6px;
-      margin-top: 10px;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      gap: 5px;
+      white-space: nowrap;
     }
-    .s-approval .controls { display: flex; }
+    .s-approval .approval-btns { display: flex; }
 
-    .btn {
-      flex: 1;
+    .abtn {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.07em;
       text-transform: uppercase;
-      padding: 7px 0;
+      padding: 5px 10px;
       border-radius: 999px;
       cursor: pointer;
-      transition: opacity 150ms ease-out;
-      -webkit-app-region: no-drag;
+      transition: opacity 150ms;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
-    .btn:hover  { opacity: 0.7; }
-    .btn:active { opacity: 0.45; }
-    .btn-approve {
-      background: transparent;
-      border: 1px solid var(--success);
-      color: var(--success);
+    .abtn:hover  { opacity: 0.75; }
+    .abtn:active { opacity: 0.5; }
+    .abtn-approve {
+      background: rgba(74,158,92,0.2);
+      border: 1px solid rgba(74,158,92,0.8);
+      color: #6FCF87;
     }
-    .btn-deny {
-      background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
+    .abtn-deny {
+      background: rgba(215,25,33,0.2);
+      border: 1px solid rgba(215,25,33,0.8);
+      color: #FF6B6B;
     }
 
-    /* ── Footer bar: SENTINEL label + LOG button ── */
-    #footer-bar {
+    /* ── Log popover ── */
+    .log-popover {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%) scale(0.95);
+      width: 260px;
+      background: rgba(10,10,10,0.92);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 200ms ease-out, transform 200ms ease-out;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+    .log-popover.open {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) scale(1);
+    }
+    /* Keep popover on-screen if mascot is near left edge */
+    .mascot-slot:first-child .log-popover {
+      left: 0;
+      transform: translateX(0) scale(0.95);
+    }
+    .mascot-slot:first-child .log-popover.open {
+      transform: translateX(0) scale(1);
+    }
+
+    .popover-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 14px;
-      border-top: 1px solid var(--border);
-      -webkit-app-region: drag;
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
     }
-
-    #panel-title {
+    .popover-title {
       font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.18em;
+      font-size: 9px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: var(--text-disabled);
+      color: rgba(255,255,255,0.35);
     }
-
-    #log-toggle {
-      -webkit-app-region: no-drag;
-      background: transparent;
-      border: 1px solid var(--border-visible);
-      border-radius: 4px;
-      color: var(--text-disabled);
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 3px 8px;
-      cursor: pointer;
-      transition: border-color 150ms ease-out, color 150ms ease-out;
-    }
-    #log-toggle:hover  { border-color: var(--text-secondary); color: var(--text-secondary); }
-    #log-toggle.active { border-color: var(--text-primary);   color: var(--text-primary); }
-
-    /* ── Log panel — slides down below cards ── */
-    #log-panel {
-      max-height: 0;
+    .popover-task {
+      font-size: 11px;
+      color: rgba(255,255,255,0.75);
+      font-style: normal;
+      max-width: 140px;
       overflow: hidden;
-      opacity: 0;
-      transition: max-height 300ms cubic-bezier(0.25,0.1,0.25,1),
-                  opacity    250ms cubic-bezier(0.25,0.1,0.25,1);
-    }
-    #log-panel.open {
-      max-height: 240px;
-      opacity: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    #log-inner {
-      padding: 12px 14px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .log-header {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--text-disabled);
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 6px;
-    }
-
-    #log-feed {
-      max-height: 170px;
+    .log-feed {
+      max-height: 200px;
       overflow-y: auto;
-      display: flex;
-      flex-direction: column;
+      padding: 6px 0;
     }
-    #log-feed::-webkit-scrollbar { width: 2px; }
-    #log-feed::-webkit-scrollbar-track { background: transparent; }
-    #log-feed::-webkit-scrollbar-thumb { background: var(--border-visible); border-radius: 1px; }
+    .log-feed::-webkit-scrollbar { width: 2px; }
+    .log-feed::-webkit-scrollbar-track { background: transparent; }
+    .log-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 1px; }
 
     .log-row {
       display: flex;
       align-items: baseline;
-      gap: 6px;
-      padding: 5px 0;
-      border-bottom: 1px solid var(--border);
+      gap: 7px;
+      padding: 5px 14px;
     }
-    .log-row:last-child { border-bottom: none; }
+    .log-row + .log-row { border-top: 1px solid rgba(255,255,255,0.04); }
 
     .log-dot {
       width: 4px;
       height: 4px;
       border-radius: 50%;
       flex-shrink: 0;
-      margin-top: 5px;
-      background: var(--text-disabled);
+      margin-top: 4px;
+      background: rgba(255,255,255,0.2);
     }
-    .log-row.ls-success          .log-dot { background: var(--success); }
-    .log-row.ls-working          .log-dot { background: var(--warning); }
-    .log-row.ls-thinking         .log-dot { background: var(--purple); }
-    .log-row.ls-needs_approval   .log-dot { background: var(--accent); }
-    .log-row.ls-error            .log-dot,
-    .log-row.ls-warning          .log-dot { background: var(--accent); }
+    .log-row.ls-success        .log-dot { background: #4A9E5C; }
+    .log-row.ls-working        .log-dot { background: #D4A843; }
+    .log-row.ls-thinking       .log-dot { background: #9B7FD4; }
+    .log-row.ls-needs_approval .log-dot { background: #D71921; }
+    .log-row.ls-error          .log-dot,
+    .log-row.ls-warning        .log-dot { background: #D71921; }
 
     .log-text {
       flex: 1;
       font-size: 11px;
-      color: var(--text-secondary);
+      color: rgba(255,255,255,0.5);
       line-height: 1.4;
     }
-    .log-text strong { color: var(--text-primary); font-weight: 500; }
+    .log-text strong { color: rgba(255,255,255,0.85); font-weight: 500; }
 
     .log-time {
       font-family: 'Space Mono', monospace;
       font-size: 8px;
-      color: var(--text-disabled);
-      white-space: nowrap;
+      color: rgba(255,255,255,0.2);
       flex-shrink: 0;
     }
 
-    /* ── Empty state ── */
-    #empty-state {
-      display: none;
-      padding: 20px 24px 6px;
+    .log-empty {
+      padding: 16px 14px;
       font-family: 'Space Mono', monospace;
       font-size: 9px;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.2);
       text-transform: uppercase;
-      color: var(--text-disabled);
     }
   </style>
 </head>
 <body>
-  <div id="panel">
-    <div id="agents-area">
-      <div id="empty-state">No agents</div>
-    </div>
-    <div id="footer-bar">
-      <span id="panel-title">Sentinel</span>
-      <button id="log-toggle" onclick="toggleLog()">Log</button>
-    </div>
-    <div id="log-panel">
-      <div id="log-inner">
-        <div class="log-header">Activity</div>
-        <div id="log-feed"></div>
-      </div>
-    </div>
-  </div>
+  <div id="mascots-area"></div>
 
   <script>
-    const IDLE_TIMEOUT = 120000; // 2 minutes
+    const IDLE_TIMEOUT = 120000; // 2 min
 
-    let lastSessions = '';
-    let lastHistory  = '';
-    let eventSource  = null;
-    let hideTimers   = {};
+    let sessions    = {};
+    let history     = [];
+    let hideTimers  = {};
+    let openLog     = null; // id of agent whose log is open
+    let eventSource = null;
 
-    // Mascot glyphs per agent id/name (Doto dot-matrix letters)
-    function mascotGlyph(id, name) {
+    // ── SVG mascot per agent ──────────────────────────────────────────────
+    function buildMascotSVG(id, name) {
       const n = (name || id || '').toUpperCase();
-      if (n.startsWith('GEMINI') || n === 'MAIN') return 'G';
-      if (n.startsWith('CLAUDE'))                  return 'C';
-      if (n.startsWith('GPT') || n.startsWith('OPENAI')) return 'O';
-      // First letter of the name as fallback
-      return n.charAt(0) || '?';
-    }
-
-    function toggleLog() {
-      const panel = document.getElementById('log-panel');
-      const btn   = document.getElementById('log-toggle');
-      const open  = panel.classList.toggle('open');
-      btn.classList.toggle('active', open);
-    }
-
-    function statusClass(status) {
-      const map = {
-        idle:           's-idle',
-        thinking:       's-thinking',
-        working:        's-working',
-        needs_approval: 's-approval',
-        success:        's-success',
-        error:          's-error',
-        warning:        's-warning',
-      };
-      return map[status] || 's-idle';
-    }
-
-    function statusLabel(status) {
-      const map = {
-        idle:           'Ready',
-        thinking:       'Thinking',
-        working:        'Working',
-        needs_approval: 'Approval',
-        success:        'Done',
-        error:          'Error',
-        warning:        'Warning',
-      };
-      return map[status] || status;
-    }
-
-    function scheduleHide(id, timestamp) {
-      if (hideTimers[id]) clearTimeout(hideTimers[id]);
-      const age       = Date.now() - timestamp;
-      const remaining = IDLE_TIMEOUT - age;
-      if (remaining <= 0) {
-        hideCard(id);
+      // Color per agent
+      let bodyColor, eyeColor, blushColor;
+      if (n.startsWith('GEMINI') || n === 'MAIN') {
+        bodyColor  = '#4285F4'; // Google blue
+        eyeColor   = '#FFFFFF';
+        blushColor = '#86AEFA';
+      } else if (n.startsWith('CLAUDE')) {
+        bodyColor  = '#CC785C'; // Claude orange/brown
+        eyeColor   = '#FFFFFF';
+        blushColor = '#E8A88A';
       } else {
-        hideTimers[id] = setTimeout(() => hideCard(id), remaining);
+        bodyColor  = '#888888';
+        eyeColor   = '#FFFFFF';
+        blushColor = '#AAAAAA';
+      }
+
+      // SVG: round blob body, two eyes, rosy cheeks, little feet
+      return `
+<svg class="mascot-svg" viewBox="0 0 56 62" xmlns="http://www.w3.org/2000/svg">
+  <g class="mascot-body-group" style="transform-origin: 28px 48px">
+
+    <!-- Shadow -->
+    <ellipse cx="28" cy="59" rx="12" ry="3.5" fill="rgba(0,0,0,0.25)"/>
+
+    <!-- Feet -->
+    <ellipse cx="20" cy="56" rx="6" ry="3.5" fill="${bodyColor}" opacity="0.8"/>
+    <ellipse cx="36" cy="56" rx="6" ry="3.5" fill="${bodyColor}" opacity="0.8"/>
+
+    <!-- Body blob -->
+    <ellipse cx="28" cy="34" rx="18" ry="20" fill="${bodyColor}"/>
+
+    <!-- Belly highlight -->
+    <ellipse cx="28" cy="37" rx="9" ry="10" fill="rgba(255,255,255,0.12)"/>
+
+    <!-- Left eye white -->
+    <ellipse cx="21" cy="28" rx="5.5" ry="6" fill="${eyeColor}"/>
+    <!-- Right eye white -->
+    <ellipse cx="35" cy="28" rx="5.5" ry="6" fill="${eyeColor}"/>
+
+    <!-- Left pupil -->
+    <circle class="eye-l" cx="22" cy="29" r="2.8" fill="#1a1a1a"/>
+    <!-- Right pupil -->
+    <circle class="eye-r" cx="36" cy="29" r="2.8" fill="#1a1a1a"/>
+
+    <!-- Left eye shine -->
+    <circle cx="23.2" cy="27.5" r="1" fill="rgba(255,255,255,0.9)"/>
+    <!-- Right eye shine -->
+    <circle cx="37.2" cy="27.5" r="1" fill="rgba(255,255,255,0.9)"/>
+
+    <!-- Blush left -->
+    <ellipse cx="16" cy="34" rx="3.5" ry="2" fill="${blushColor}" opacity="0.6"/>
+    <!-- Blush right -->
+    <ellipse cx="40" cy="34" rx="3.5" ry="2" fill="${blushColor}" opacity="0.6"/>
+
+    <!-- Smile (default) -->
+    <path class="mouth-smile" d="M 23 38 Q 28 43 33 38" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="1.8" stroke-linecap="round"/>
+
+  </g>
+</svg>`;
+    }
+
+    // ── Build / update mascot slot ────────────────────────────────────────
+    function getOrCreateSlot(s) {
+      const area = document.getElementById('mascots-area');
+      let slot = area.querySelector(`[data-id="${s.id}"]`);
+      if (!slot) {
+        slot = document.createElement('div');
+        slot.className = 'mascot-slot';
+        slot.dataset.id = s.id;
+        slot.innerHTML = `
+          <div class="mascot-figure">
+            <div class="mascot-ring"></div>
+            ${buildMascotSVG(s.id, s.name)}
+            <div class="approval-btns">
+              <button class="abtn abtn-approve">OK</button>
+              <button class="abtn abtn-deny">No</button>
+            </div>
+            <div class="log-popover">
+              <div class="popover-header">
+                <span class="popover-title">${(s.name || s.id).toUpperCase()}</span>
+                <span class="popover-task"></span>
+              </div>
+              <div class="log-feed"></div>
+            </div>
+          </div>
+          <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
+        `;
+        // Approval button handlers
+        slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
+        slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
+        // Click mascot to toggle log
+        slot.querySelector('.mascot-figure').onclick = (e) => { toggleLog(s.id); };
+        area.appendChild(slot);
+      }
+      return slot;
+    }
+
+    function updateSlot(slot, s) {
+      // Status classes
+      const sc = statusClass(s.status);
+      const wasHidden = slot.classList.contains('hidden');
+      slot.className = `mascot-slot ${sc}${wasHidden ? ' hidden' : ''}`;
+
+      // Name label
+      slot.querySelector('.mascot-label').textContent = (s.name || s.id).toUpperCase();
+
+      // Popover header
+      slot.querySelector('.popover-title').textContent = (s.name || s.id).toUpperCase();
+      const taskEl = slot.querySelector('.popover-task');
+      taskEl.textContent = (s.status !== 'idle' && s.task) ? s.task : '';
+
+      // Auto-hide logic
+      if (s.status === 'idle') {
+        scheduleHide(s.id, s.timestamp || Date.now());
+      } else {
+        showSlot(s.id);
+      }
+
+      // If log is open for this agent, refresh its log feed
+      if (openLog === s.id) renderLogFeed(slot, s.id);
+    }
+
+    function statusClass(st) {
+      return { idle:'s-idle', thinking:'s-thinking', working:'s-working',
+               needs_approval:'s-approval', success:'s-success',
+               error:'s-error', warning:'s-warning' }[st] || 's-idle';
+    }
+
+    // ── Log popover ───────────────────────────────────────────────────────
+    function toggleLog(id) {
+      if (openLog === id) {
+        closeLog();
+      } else {
+        if (openLog) closeLog();
+        openLog = id;
+        const slot = document.querySelector(`[data-id="${id}"]`);
+        if (slot) {
+          renderLogFeed(slot, id);
+          slot.querySelector('.log-popover').classList.add('open');
+        }
       }
     }
 
-    function hideCard(id) {
-      const wrap = document.querySelector(`[data-session-id="${id}"]`);
-      if (wrap) wrap.classList.add('hidden');
-      updateEmptyState();
-      updateLastVisible();
+    function closeLog() {
+      if (!openLog) return;
+      const slot = document.querySelector(`[data-id="${openLog}"]`);
+      if (slot) slot.querySelector('.log-popover').classList.remove('open');
+      openLog = null;
     }
 
-    function showCard(id) {
-      if (hideTimers[id]) clearTimeout(hideTimers[id]);
-      const wrap = document.querySelector(`[data-session-id="${id}"]`);
-      if (wrap) wrap.classList.remove('hidden');
-      updateEmptyState();
-      updateLastVisible();
-    }
-
-    // Remove right border from last visible card
-    function updateLastVisible() {
-      const area  = document.getElementById('agents-area');
-      const wraps = [...area.querySelectorAll('.agent-wrap:not(.hidden)')];
-      area.querySelectorAll('.agent-wrap').forEach(w => w.classList.remove('last-visible'));
-      if (wraps.length > 0) wraps[wraps.length - 1].classList.add('last-visible');
-    }
-
-    function updateEmptyState() {
-      const area    = document.getElementById('agents-area');
-      const visible = area.querySelectorAll('.agent-wrap:not(.hidden)');
-      const empty   = document.getElementById('empty-state');
-      empty.style.display = visible.length === 0 ? 'block' : 'none';
-    }
-
-    function makeCard(s) {
-      const wrap = document.createElement('div');
-      wrap.className = 'agent-wrap';
-      wrap.dataset.sessionId = s.id;
-
-      const card = document.createElement('div');
-      card.className = 'agent-card';
-
-      // Mascot row: big Doto glyph + status pip
-      const mascotRow = document.createElement('div');
-      mascotRow.className = 'mascot-row';
-
-      const glyph = document.createElement('div');
-      glyph.className = 'mascot-glyph';
-      glyph.textContent = mascotGlyph(s.id, s.name);
-
-      const pipWrap = document.createElement('div');
-      pipWrap.className = 'status-pip-wrap';
-      const pip = document.createElement('div');
-      pip.className = 'status-pip';
-      pipWrap.appendChild(pip);
-
-      mascotRow.appendChild(glyph);
-      mascotRow.appendChild(pipWrap);
-
-      // Name
-      const name = document.createElement('div');
-      name.className = 'agent-name';
-
-      // Status label
-      const label = document.createElement('div');
-      label.className = 'status-label';
-
-      // Task
-      const task = document.createElement('div');
-      task.className = 'task-text';
-
-      // Controls
-      const controls = document.createElement('div');
-      controls.className = 'controls';
-      const approve = document.createElement('button');
-      approve.className = 'btn btn-approve';
-      approve.textContent = 'Approve';
-      approve.onclick = () => action(s.id, 'approve');
-      const deny = document.createElement('button');
-      deny.className = 'btn btn-deny';
-      deny.textContent = 'Deny';
-      deny.onclick = () => action(s.id, 'deny');
-      controls.appendChild(approve);
-      controls.appendChild(deny);
-
-      card.appendChild(mascotRow);
-      card.appendChild(name);
-      card.appendChild(label);
-      card.appendChild(task);
-      card.appendChild(controls);
-      wrap.appendChild(card);
-      return wrap;
-    }
-
-    function renderSessions(sessions) {
-      const area = document.getElementById('agents-area');
-      const ids  = new Set(Object.keys(sessions));
-
-      // Remove stale cards
-      area.querySelectorAll('[data-session-id]').forEach(el => {
-        if (!ids.has(el.dataset.sessionId)) el.remove();
-      });
-
-      Object.values(sessions).forEach(s => {
-        let wrap = area.querySelector(`[data-session-id="${s.id}"]`);
-        if (!wrap) {
-          wrap = makeCard(s);
-          area.appendChild(wrap);
-        }
-
-        // Update status class (keep hidden class if set)
-        const hidden = wrap.classList.contains('hidden');
-        wrap.className = `agent-wrap ${statusClass(s.status)}${hidden ? ' hidden' : ''}`;
-
-        // Update content
-        const glyph = wrap.querySelector('.mascot-glyph');
-        if (glyph) glyph.textContent = mascotGlyph(s.id, s.name);
-        wrap.querySelector('.agent-name').textContent   = s.name || s.id;
-        wrap.querySelector('.status-label').textContent = statusLabel(s.status);
-        wrap.querySelector('.task-text').textContent    = (s.status === 'idle') ? '' : (s.task || '');
-
-        if (s.status === 'idle') {
-          scheduleHide(s.id, s.timestamp || Date.now());
-        } else {
-          showCard(s.id);
-        }
-      });
-
-      updateEmptyState();
-      updateLastVisible();
-    }
-
-    function renderHistory(history) {
-      const feed = document.getElementById('log-feed');
+    function renderLogFeed(slot, id) {
+      const feed = slot.querySelector('.log-feed');
+      // Show all history (global — could filter by name later)
+      const entries = history.slice(-30).reverse(); // newest first
+      if (!entries.length) {
+        feed.innerHTML = '<div class="log-empty">No activity yet</div>';
+        return;
+      }
       feed.innerHTML = '';
-      history.forEach(h => {
+      entries.forEach(h => {
         const row = document.createElement('div');
         row.className = `log-row ls-${h.status}`;
-
-        const dot = document.createElement('div');
-        dot.className = 'log-dot';
-
-        const text = document.createElement('div');
-        text.className = 'log-text';
-        const strong = document.createElement('strong');
-        strong.textContent = (h.name || h.id) + ' ';
-        text.appendChild(strong);
-        text.appendChild(document.createTextNode(h.task || ''));
-
-        const time = document.createElement('div');
-        time.className = 'log-time';
-        time.textContent = h.time || '';
-
-        row.appendChild(dot);
-        row.appendChild(text);
-        row.appendChild(time);
+        row.innerHTML = `
+          <div class="log-dot"></div>
+          <div class="log-text"><strong>${h.name || h.id}</strong> ${h.task || ''}</div>
+          <div class="log-time">${h.time || ''}</div>
+        `;
         feed.appendChild(row);
       });
     }
 
+    // ── Auto-hide ─────────────────────────────────────────────────────────
+    function scheduleHide(id, timestamp) {
+      if (hideTimers[id]) clearTimeout(hideTimers[id]);
+      const remaining = IDLE_TIMEOUT - (Date.now() - timestamp);
+      if (remaining <= 0) {
+        hideSlot(id);
+      } else {
+        hideTimers[id] = setTimeout(() => hideSlot(id), remaining);
+      }
+    }
+
+    function hideSlot(id) {
+      const slot = document.querySelector(`[data-id="${id}"]`);
+      if (slot) slot.classList.add('hidden');
+      if (openLog === id) closeLog();
+    }
+
+    function showSlot(id) {
+      if (hideTimers[id]) clearTimeout(hideTimers[id]);
+      const slot = document.querySelector(`[data-id="${id}"]`);
+      if (slot) slot.classList.remove('hidden');
+    }
+
+    // ── Render all sessions ───────────────────────────────────────────────
+    function renderSessions(newSessions) {
+      const area = document.getElementById('mascots-area');
+      const ids  = new Set(Object.keys(newSessions));
+
+      // Remove gone sessions
+      area.querySelectorAll('[data-id]').forEach(el => {
+        if (!ids.has(el.dataset.id)) el.remove();
+      });
+
+      Object.values(newSessions).forEach(s => {
+        const slot = getOrCreateSlot(s);
+        updateSlot(slot, s);
+      });
+    }
+
+    // ── SSE ───────────────────────────────────────────────────────────────
     function connectSSE() {
       if (eventSource) eventSource.close();
       eventSource = new EventSource('http://localhost:49152/stream');
       eventSource.addEventListener('update', e => {
         try {
-          const { sessions, history } = JSON.parse(e.data);
-          const ss = JSON.stringify(sessions);
-          const hs = JSON.stringify(history);
-          if (ss !== lastSessions) { lastSessions = ss; renderSessions(sessions); }
-          if (hs !== lastHistory)  { lastHistory  = hs; renderHistory(history); }
+          const data = JSON.parse(e.data);
+          sessions = data.sessions || {};
+          history  = data.history  || [];
+          renderSessions(sessions);
         } catch(_) {}
       });
       eventSource.onerror = () => {
@@ -608,13 +564,20 @@
       };
     }
 
-    async function action(id, type) {
+    async function doAction(id, type) {
       await fetch('http://localhost:49152/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action: type })
       });
     }
+
+    // Close log when clicking outside
+    document.addEventListener('click', (e) => {
+      if (openLog && !e.target.closest(`[data-id="${openLog}"]`)) {
+        closeLog();
+      }
+    });
 
     connectSSE();
   </script>
