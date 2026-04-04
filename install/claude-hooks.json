@@ -1,0 +1,38 @@
+{
+  "Stop": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"success\",\"task\":\"Done\"}' > /dev/null &",
+          "async": true
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"thinking\",\"task\":\"Thinking...\"}' > /dev/null &",
+          "async": true
+        }
+      ]
+    }
+  ],
+  "PreToolUse": [
+    {
+      "matcher": "",
+      "hooks": [
+        {
+          "type": "command",
+          "command": "~/.claude/hooks/sentinel-pre-tool.sh",
+          "async": true
+        }
+      ]
+    }
+  ]
+}
