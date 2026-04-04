@@ -4,9 +4,10 @@ input=$(cat)
 tool_name=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_name','tool'))" 2>/dev/null || echo "tool")
 
 # Claude Code destructive tool names (exact match, case-sensitive)
-# Read, Glob, Grep, LS are safe — only Write, Edit, Bash, NotebookEdit need approval
+# Bash is NOT here — Claude Code's own permission system gates dangerous bash commands.
+# Only file-mutation tools need mascot approval.
 case "$tool_name" in
-  Write|Edit|Bash|NotebookEdit)
+  Write|Edit|NotebookEdit)
     DESTRUCTIVE=1
     ;;
   *)

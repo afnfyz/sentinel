@@ -15,11 +15,10 @@
       overflow: hidden;
       font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      /* Entire body is draggable — interactive children override with no-drag */
-      -webkit-app-region: drag;
+      /* Dragging is handled by Swift's isMovableByWindowBackground.
+         No -webkit-app-region needed. Mouse events that pass through
+         to the window background trigger native macOS window drag. */
     }
-
-    button, .mascot-label { -webkit-app-region: no-drag; }
 
     body {
       display: flex;
@@ -44,7 +43,9 @@
       pointer-events: none;
     }
 
-    /* ── The mascot figure ── */
+    /* ── The mascot figure — pointer-events:none so mouse events
+         pass through to the window background for native dragging.
+         Tap detection uses document-level mousedown/mouseup timing. ── */
     .mascot-figure {
       position: relative;
       width: 56px;
@@ -52,23 +53,17 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      pointer-events: none;
+      cursor: grab;
     }
 
-    /* ── Tap target: no-drag overlay so click fires normally ── */
-    .mascot-tap {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      cursor: pointer;
-      -webkit-app-region: no-drag;
-      z-index: 10;
-    }
-
-    /* ── SVG mascot body ── */
+    /* ── SVG mascot body — pointer-events: none so drags pass through
+         to the window background (macOS handles the drag natively) ── */
     .mascot-svg {
       width: 56px;
       height: 56px;
       overflow: visible;
+      pointer-events: none;
     }
 
     /* ── Idle: gentle float ── */
@@ -191,8 +186,7 @@
       gap: 5px;
       white-space: nowrap;
     }
-    .s-approval .approval-btns { display: flex; }
-    .s-approval .mascot-tap { display: none; } /* buttons take over during approval */
+    .s-approval .approval-btns { display: flex; pointer-events: auto; }
 
     .abtn {
       font-family: 'Space Mono', monospace;
@@ -240,7 +234,7 @@
     }
     #log-popover.open {
       opacity: 1;
-      pointer-events: auto;
+      pointer-events: auto !important;
       transform: scale(1);
     }
 
@@ -426,13 +420,10 @@
               <button class="abtn abtn-approve">OK</button>
               <button class="abtn abtn-deny">No</button>
             </div>
-            <div class="mascot-tap"></div>
           </div>
           <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
         `;
-        // Tap overlay click — no-drag so click events work normally
-        slot.querySelector('.mascot-tap').onclick = () => toggleLog(s.id, slot);
-        // Approval buttons
+        // Approval buttons — these have pointer-events:auto
         slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
         slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
         area.appendChild(slot);
@@ -607,12 +598,43 @@
       });
     }
 
-    // Close log when clicking outside mascot and popover
-    document.addEventListener('click', (e) => {
-      if (!openLog) return;
-      if (!e.target.closest(`[data-id="${openLog}"]`) && !e.target.closest('#log-popover')) {
-        closeLog();
+    // ── Tap detection ───────────────────────────────────────────────────
+    // Everything except buttons is pointer-events:none, so mouse events
+    // always reach the document. We detect taps (short press, small move)
+    // and check if coordinates overlap a mascot figure.
+    let _tapX = 0, _tapY = 0, _tapTime = 0;
+    document.addEventListener('mousedown', e => {
+      _tapX = e.clientX; _tapY = e.clientY; _tapTime = Date.now();
+    });
+    document.addEventListener('mouseup', e => {
+      const dt = Date.now() - _tapTime;
+      const dist = Math.hypot(e.clientX - _tapX, e.clientY - _tapY);
+      if (dt > 300 || dist > 8) return; // was a drag or long-press
+
+      // Check if tap landed inside the log popover
+      const popover = document.getElementById('log-popover');
+      if (popover.classList.contains('open')) {
+        const pr = popover.getBoundingClientRect();
+        if (e.clientX >= pr.left && e.clientX <= pr.right &&
+            e.clientY >= pr.top  && e.clientY <= pr.bottom) {
+          return; // tapped inside popover, don't close it
+        }
       }
+
+      // Check if tap landed on a mascot figure
+      const slots = document.querySelectorAll('.mascot-slot:not(.hidden)');
+      for (const slot of slots) {
+        const fig = slot.querySelector('.mascot-figure');
+        const r = fig.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right &&
+            e.clientY >= r.top  && e.clientY <= r.bottom) {
+          toggleLog(slot.dataset.id, slot);
+          return;
+        }
+      }
+
+      // Tapped outside everything → close log
+      if (openLog) closeLog();
     });
 
     connectSSE();
