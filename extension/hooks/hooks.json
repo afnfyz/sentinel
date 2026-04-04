@@ -33,17 +33,6 @@
         ]
       }
     ],
-    "AfterTool": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "name": "sentinel-after-tool",
-            "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"main\",\"name\":\"Gemini\",\"status\":\"thinking\",\"task\":\"Thinking...\"}' > /dev/null &"
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
