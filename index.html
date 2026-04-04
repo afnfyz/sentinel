@@ -43,23 +43,18 @@
       pointer-events: none;
     }
 
-    /* ── The clickable mascot figure — no-drag so clicks work ── */
+    /* ── The mascot figure — drag region, click handled via JS ── */
     .mascot-figure {
-      cursor: pointer;
+      cursor: grab;
       position: relative;
       width: 56px;
       height: 56px;
       display: flex;
       align-items: center;
       justify-content: center;
-      -webkit-app-region: no-drag;
-    }
-
-    /* ── Drag handle: the label under each mascot ── */
-    .mascot-label {
       -webkit-app-region: drag;
-      cursor: move;
     }
+    .mascot-figure:active { cursor: grabbing; }
 
     /* ── SVG mascot body ── */
     .mascot-svg {
@@ -144,7 +139,7 @@
       100% { transform: translateY(3px) rotate(-5deg); }
     }
 
-    /* ── Status name tag under mascot (also the drag handle) ── */
+    /* ── Status name tag under mascot ── */
     .mascot-label {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
@@ -155,10 +150,9 @@
       text-align: center;
       text-shadow: 0 1px 4px rgba(0,0,0,0.8);
       white-space: nowrap;
-      padding: 4px 8px;
-      -webkit-app-region: drag;
-      cursor: move;
+      padding: 2px 0;
       user-select: none;
+      -webkit-app-region: no-drag;
     }
 
     /* ── Status indicator ring around mascot ── */
@@ -204,6 +198,7 @@
       transition: opacity 150ms;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
+      -webkit-app-region: no-drag;
     }
     .abtn:hover  { opacity: 0.75; }
     .abtn:active { opacity: 0.5; }
@@ -430,8 +425,15 @@
         // Approval button handlers
         slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
         slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
-        // Click mascot figure to toggle log
-        slot.querySelector('.mascot-figure').onclick = (e) => { toggleLog(s.id, slot); };
+        // Tap (not drag) on mascot figure toggles log
+        // WKWebView: drag region swallows click events, so detect via mousedown/mouseup distance
+        let mdX = 0, mdY = 0;
+        const fig = slot.querySelector('.mascot-figure');
+        fig.addEventListener('mousedown', (e) => { mdX = e.clientX; mdY = e.clientY; });
+        fig.addEventListener('mouseup',   (e) => {
+          const dist = Math.hypot(e.clientX - mdX, e.clientY - mdY);
+          if (dist < 6) toggleLog(s.id, slot);
+        });
         area.appendChild(slot);
       }
       return slot;
