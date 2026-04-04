@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gemini Sentinel - Mission Control</title>
+  <style>
+    :root {
+      --bg: rgba(18, 18, 18, 0.98);
+      --card: rgba(45, 45, 45, 0.6);
+      --idle: #3498db; --thinking: #9b59b6; --working: #f1c40f; --warning: #e74c3c; --success: #2ecc71;
+      --disconnected: #888;
+    }
+
+    body {
+      margin: 0; padding: 15px;
+      font-family: -apple-system, sans-serif;
+      display: flex; justify-content: center; align-items: flex-start;
+      height: 100vh; background: transparent; overflow: hidden;
+      transition: opacity 0.5s ease;
+    }
+    body.disconnected {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    #sentinel-panel {
+      background: var(--bg);
+      backdrop-filter: blur(25px);
+      border-radius: 28px;
+      padding: 15px;
+      display: flex; gap: 0;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.7);
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+      min-width: 220px;
+    }
+
+    #sentinel-panel.show-history {
+      width: 750px; gap: 20px; padding: 20px;
+    }
+
+    /* Active Agents Section */
+    #agents-area {
+      display: flex; gap: 15px; flex-wrap: wrap; align-items: center;
+    }
+
+    .agent-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 15px;
+      width: 170px;
+      display: flex; flex-direction: column; align-items: center;
+      border: 1px solid rgba(255,255,255,0.05);
+      position: relative;
+    }
+
+    .mascot {
+      width: 48px; height: 48px; border-radius: 14px;
+      margin-bottom: 12px; background: var(--idle);
+      position: relative;
+    }
+
+    .mascot::before, .mascot::after {
+      content: ''; width: 6px; height: 6px; background: #000;
+      border-radius: 50%; position: absolute; top: 12px;
+    }
+    .mascot::before { left: 14px; } .mascot::after { right: 14px; }
+
+    .name { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 900; letter-spacing: 1px; }
+    .task { font-size: 11px; color: #eee; text-align: center; min-height: 36px; margin-top: 8px; line-height: 1.4; }
+
+    /* History Toggle Button */
+    #toggle-history {
+      background: rgba(255,255,255,0.1);
+      border: none; color: #666; width: 30px; height: 30px;
+      border-radius: 50%; cursor: pointer; display: flex; 
+      align-items: center; justify-content: center; font-size: 14px;
+      margin-left: 10px; transition: 0.2s;
+    }
+    #toggle-history:hover { background: rgba(255,255,255,0.2); color: #fff; }
+
+    /* Mission Control Section */
+    #log-panel {
+      display: none; flex: 1; border-left: 1px solid rgba(255,255,255,0.1);
+      padding-left: 20px; flex-direction: column; opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    #sentinel-panel.show-history #log-panel {
+      display: flex; opacity: 1;
+    }
+
+    #log-panel h3 {
+      font-size: 10px; text-transform: uppercase; color: #555;
+      margin: 0 0 12px 0; letter-spacing: 2px;
+    }
+
+    #log-feed {
+      overflow-y: auto; height: 300px; display: flex; flex-direction: column; gap: 8px;
+    }
+
+    .log-entry {
+      font-size: 10.5px; line-height: 1.3; color: #999;
+      padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.05);
+      animation: slideIn 0.3s ease-out;
+    }
+    .log-entry strong { color: #ccc; }
+    .log-entry .time { color: #444; font-size: 9px; float: right; }
+
+    /* Mascot Animations */
+    .status-thinking .mascot { background: var(--thinking); box-shadow: 0 0 20px var(--thinking); animation: pulse 2s infinite; }
+    .status-working .mascot { background: var(--working); box-shadow: 0 0 20px var(--working); animation: pulse 1s infinite; }
+    .status-needs_approval .mascot { background: var(--warning); box-shadow: 0 0 30px var(--warning); animation: shake 0.2s infinite; }
+    .status-success .mascot { background: var(--success); transform: translateY(-5px); }
+    .status-idle .mascot { background: var(--idle); animation: breathe 3s infinite ease-in-out; }
+    .status-disconnected .mascot { background: var(--disconnected); animation: none; }
+
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+    @keyframes shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } }
+    @keyframes breathe { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.05); opacity: 1; } }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+    .controls { display: none; gap: 8px; margin-top: 10px; width: 100%; }
+    .status-needs_approval .controls { display: flex; }
+    .btn-action { flex: 1; font-size: 10px; padding: 6px; border: none; border-radius: 8px; color: #fff; cursor: pointer; font-weight: 700; }
+    .approve { background: var(--success); } .deny { background: var(--warning); }
+  </style>
+</head>
+<body>
+  <div id="sentinel-panel">
+    <div id="agents-area"></div>
+    <button id="toggle-history" title="Toggle History" onclick="toggleHistory()">📜</button>
+    <div id="log-panel">
+      <h3>Mission Control</h3>
+      <div id="log-feed"></div>
+    </div>
+  </div>
+
+  <script>
+    let lastHistory = '';
+    let lastSessions = '';
+    let isConnected = true;
+    let eventSource = null;
+
+    function toggleHistory() {
+      const panel = document.getElementById('sentinel-panel');
+      panel.classList.toggle('show-history');
+    }
+
+    function updateAgentCard(session) {
+        const agentsArea = document.getElementById('agents-area');
+        let card = document.querySelector(`#agents-area .agent-card[data-session-id="${session.id}"]`);
+
+        if (!card) {
+            card = document.createElement('div');
+            card.className = `agent-card status-${session.status}`;
+            card.dataset.sessionId = session.id;
+            card.innerHTML = `
+                <div class="name">${session.name || session.id}</div>
+                <div class="mascot"></div>
+                <div class="task">${session.task}</div>
+                <div class="controls">
+                    <button class="btn-action approve" onclick="action('${session.id}', 'approve')">OK</button>
+                    <button class="btn-action deny" onclick="action('${session.id}', 'deny')">NO</button>
+                </div>
+            `;
+            agentsArea.appendChild(card);
+        } else {
+            card.className = `agent-card status-${session.status}`;
+            card.querySelector('.task').textContent = session.task;
+            card.querySelector('.name').textContent = session.name || session.id;
+        }
+
+        // Show/hide controls based on status
+        const controls = card.querySelector('.controls');
+        if (session.status === 'needs_approval') {
+            controls.style.display = 'flex';
+        } else {
+            controls.style.display = 'none';
+        }
+    }
+
+    function renderSessions(sessions) {
+      const agentsArea = document.getElementById('agents-area');
+      const currentSessionIds = new Set(Object.keys(sessions));
+      
+      // Remove old cards that are no longer in sessions
+      agentsArea.querySelectorAll('.agent-card').forEach(card => {
+        if (!currentSessionIds.has(card.dataset.sessionId)) {
+          card.remove();
+        }
+      });
+
+      // Update or add new cards
+      Object.values(sessions).forEach(s => {
+        updateAgentCard(s);
+      });
+    }
+
+    function renderHistory(history) {
+      const logFeed = document.getElementById('log-feed');
+      logFeed.innerHTML = ''; // Clear previous logs
+      history.forEach(h => {
+        const entry = document.createElement('div');
+        entry.className = `log-entry status-${h.status}`;
+        entry.innerHTML = `
+          <span class="time">${h.time}</span>
+          <strong>${h.name}</strong> ${h.task}
+        `;
+        logFeed.appendChild(entry);
+      });
+    }
+
+    function connectSSE() {
+      if (eventSource) {
+        eventSource.close();
+      }
+      eventSource = new EventSource('http://localhost:49152/stream');
+
+      eventSource.addEventListener('update', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const { sessions, history } = data;
+
+          const sessionsChanged = JSON.stringify(sessions) !== lastSessions;
+          const historyChanged = JSON.stringify(history) !== lastHistory;
+
+          if (sessionsChanged) {
+            lastSessions = JSON.stringify(sessions);
+            renderSessions(sessions);
+          }
+          if (historyChanged) {
+            lastHistory = JSON.stringify(history);
+            renderHistory(history);
+          }
+          
+          if (!isConnected) {
+            isConnected = true;
+            document.body.classList.remove('disconnected');
+            console.log('[UI] Connected to server.');
+          }
+        } catch (e) {
+          console.error("SSE Error processing event:", e);
+        }
+      });
+
+      eventSource.onerror = () => {
+        isConnected = false;
+        document.body.classList.add('disconnected');
+        console.error('[UI] SSE connection error. Retrying in 5s...');
+        eventSource.close();
+        setTimeout(connectSSE, 5000);
+      };
+    }
+
+    async function action(id, type) {
+      await fetch('http://localhost:49152/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: type })
+      });
+    }
+
+    connectSSE(); // Initial connection
+  </script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+{
+  "hooks": {
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "sentinel-thinking",
+            "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"main\",\"name\":\"Gemini\",\"status\":\"thinking\",\"task\":\"Thinking...\"}' > /dev/null &"
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "sentinel-done",
+            "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"main\",\"name\":\"Gemini\",\"status\":\"success\",\"task\":\"Done\"}' > /dev/null &"
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "sentinel-working",
+            "command": "/Users/afnan_dfx/.gemini/hooks/sentinel-before-tool.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "sentinel-session-start",
+            "command": "/Users/afnan_dfx/.gemini/hooks/sentinel-session-start.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "name": "sentinel-session-end",
+            "command": "/Users/afnan_dfx/.gemini/hooks/sentinel-session-end.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

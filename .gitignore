@@ -1,0 +1,7 @@
+node_modules/
+state.json
+app.log
+server.log
+hook.log
+GeminiSentinel
+GeminiSentinel.app/Contents/MacOS/GeminiSentinel
