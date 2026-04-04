@@ -37,6 +37,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.hasShadow = false
         window.isMovableByWindowBackground = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        window.alphaValue = 1.0
+        window.hidesOnDeactivate = false
 
         // 3. Setup WebView
         let config = WKWebViewConfiguration()
