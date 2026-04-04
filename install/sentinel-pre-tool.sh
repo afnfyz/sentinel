@@ -2,11 +2,19 @@
 
 input=$(cat)
 tool_name=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_name','tool'))" 2>/dev/null || echo "tool")
-tool_input=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); inp=d.get('tool_input',{}); print(str(inp)[:120])" 2>/dev/null || echo "")
 
-# Let read-only tools through immediately
-DESTRUCTIVE="write_file|replace|edit_file|run_shell_command|bash|delete|move|create|overwrite|execute|computer_use"
-if ! echo "$tool_name" | grep -qiE "$DESTRUCTIVE"; then
+# Claude Code destructive tool names (exact match, case-sensitive)
+# Read, Glob, Grep, LS are safe — only Write, Edit, Bash, NotebookEdit need approval
+case "$tool_name" in
+  Write|Edit|Bash|NotebookEdit)
+    DESTRUCTIVE=1
+    ;;
+  *)
+    DESTRUCTIVE=0
+    ;;
+esac
+
+if [ "$DESTRUCTIVE" -eq 0 ]; then
   curl -s -X POST http://localhost:49152/update \
     -H 'Content-Type: application/json' \
     -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"working\",\"task\":\"Running: $tool_name\"}" > /dev/null
@@ -32,7 +40,6 @@ if [ -t 0 ] || [ -e /dev/tty ]; then
 fi
 
 if [ -n "$TERMINAL_INPUT" ]; then
-  # Terminal answered first — resolve the mascot too so it clears
   kill $CURL_PID 2>/dev/null
   wait $CURL_PID 2>/dev/null
   if [[ "$TERMINAL_INPUT" =~ ^[Nn] ]]; then
@@ -47,7 +54,6 @@ if [ -n "$TERMINAL_INPUT" ]; then
     echo '{"decision":"allow"}'
   fi
 else
-  # No terminal input — wait for mascot click
   wait $CURL_PID
   RESULT=$(cat /tmp/sentinel-approval-claude 2>/dev/null)
   rm -f /tmp/sentinel-approval-claude
@@ -58,7 +64,6 @@ else
   elif [ "$MASCOT_ACTION" = "deny" ]; then
     echo '{"decision":"deny","reason":"Denied from Sentinel."}'
   else
-    # Timed out — allow
     echo '{"decision":"allow"}'
   fi
 fi

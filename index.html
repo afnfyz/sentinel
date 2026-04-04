@@ -44,18 +44,25 @@
       pointer-events: none;
     }
 
-    /* ── The mascot figure — inherits drag from body, click via JS ── */
+    /* ── The mascot figure ── */
     .mascot-figure {
-      cursor: grab;
       position: relative;
       width: 56px;
       height: 56px;
       display: flex;
       align-items: center;
       justify-content: center;
-      /* No -webkit-app-region here — body handles it */
     }
-    .mascot-figure:active { cursor: grabbing; }
+
+    /* ── Tap target: no-drag overlay so click fires normally ── */
+    .mascot-tap {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      z-index: 10;
+    }
 
     /* ── SVG mascot body ── */
     .mascot-svg {
@@ -185,6 +192,7 @@
       white-space: nowrap;
     }
     .s-approval .approval-btns { display: flex; }
+    .s-approval .mascot-tap { display: none; } /* buttons take over during approval */
 
     .abtn {
       font-family: 'Space Mono', monospace;
@@ -418,10 +426,13 @@
               <button class="abtn abtn-approve">OK</button>
               <button class="abtn abtn-deny">No</button>
             </div>
+            <div class="mascot-tap"></div>
           </div>
           <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
         `;
-        // Approval button handlers — buttons are no-drag so onclick works normally
+        // Tap overlay click — no-drag so click events work normally
+        slot.querySelector('.mascot-tap').onclick = () => toggleLog(s.id, slot);
+        // Approval buttons
         slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
         slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
         area.appendChild(slot);
@@ -596,26 +607,10 @@
       });
     }
 
-    // ── Body-level tap detection (drag region swallows click events) ──────
-    // mousedown/mouseup still fire even on drag regions in WKWebView
-    let tapDownX = 0, tapDownY = 0;
-    document.addEventListener('mousedown', (e) => {
-      tapDownX = e.clientX;
-      tapDownY = e.clientY;
-    });
-    document.addEventListener('mouseup', (e) => {
-      const dist = Math.hypot(e.clientX - tapDownX, e.clientY - tapDownY);
-      if (dist >= 6) return; // it was a drag, not a tap
-
-      // Hit-test: did the tap land inside a mascot figure?
-      const fig = e.target.closest('.mascot-figure');
-      if (fig) {
-        const slot = fig.closest('[data-id]');
-        if (slot) { toggleLog(slot.dataset.id, slot); return; }
-      }
-
-      // Tap outside mascot and popover → close log
-      if (openLog && !e.target.closest('#log-popover')) {
+    // Close log when clicking outside mascot and popover
+    document.addEventListener('click', (e) => {
+      if (!openLog) return;
+      if (!e.target.closest(`[data-id="${openLog}"]`) && !e.target.closest('#log-popover')) {
         closeLog();
       }
     });

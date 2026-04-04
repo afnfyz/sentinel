@@ -71,15 +71,16 @@ function addLog(id, status, task) {
 
 // --- Routes ---
 app.post('/update', (req, res) => {
-  const { id, status, task } = req.body;
+  const { id, name, status, task } = req.body;
   const sessionId = id || 'main';
-  
+
   if (!sessions[sessionId]) {
-    sessions[sessionId] = { id: sessionId, name: sessionId, status: 'idle', task: 'Initializing...', timestamp: Date.now() };
+    sessions[sessionId] = { id: sessionId, name: name || sessionId, status: 'idle', task: 'Initializing...', timestamp: Date.now() };
   }
 
   sessions[sessionId] = {
-    ...sessions[sessionId], // Preserve existing session properties
+    ...sessions[sessionId],
+    ...(name && { name }),  // update name if provided
     status,
     task,
     timestamp: Date.now()
@@ -92,11 +93,11 @@ app.post('/update', (req, res) => {
     setTimeout(() => {
       if (sessions[sessionId] && sessions[sessionId].status === status) {
         if (sessionId === 'main') {
-          sessions[sessionId] = { id: sessionId, name: sessionId, status: 'idle', task: 'Ready', timestamp: Date.now() };
+          sessions[sessionId] = { id: sessionId, name: sessions[sessionId]?.name || 'Gemini', status: 'idle', task: 'Ready', timestamp: Date.now() };
+          addLog(sessionId, 'idle', 'Ready');
         } else {
           delete sessions[sessionId]; // Remove sub-agents when done
         }
-        addLog(sessionId, sessions[sessionId].status, sessions[sessionId].task);
         saveState();
       }
     }, 4000);
