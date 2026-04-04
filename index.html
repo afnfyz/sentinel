@@ -3,365 +3,451 @@
 <head>
   <meta charset="UTF-8">
   <title>Sentinel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
+    /* ── Tokens ── */
     :root {
-      --idle:     #007AFF;
-      --thinking: #9b59b6;
-      --working:  #FF9500;
-      --approval: #FF3B30;
-      --success:  #34C759;
-      --error:    #FF3B30;
-      --warning:  #FF9500;
+      --black:           #000000;
+      --surface:         #111111;
+      --surface-raised:  #1A1A1A;
+      --border:          #222222;
+      --border-visible:  #333333;
+      --text-disabled:   #666666;
+      --text-secondary:  #999999;
+      --text-primary:    #E8E8E8;
+      --text-display:    #FFFFFF;
+      --accent:          #D71921;
+      --success:         #4A9E5C;
+      --warning:         #D4A843;
+      --info:            #5B9BF6;
+
+      --idle-color:     var(--info);
+      --think-color:    #9B7FD4;
+      --work-color:     var(--warning);
+      --approval-color: var(--accent);
+      --success-color:  var(--success);
+
+      /* Auto-hide after 2 minutes of no activity */
+      --idle-timeout-ms: 120000;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     html, body {
       width: 100%; height: 100%;
       background: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
       overflow: hidden;
+      /* Allow dragging from anywhere not interactive */
+      -webkit-app-region: drag;
     }
+
+    button, a { -webkit-app-region: no-drag; }
 
     body {
       display: flex;
       align-items: flex-start;
       justify-content: flex-start;
-      padding: 12px;
-      /* Tell WKWebView to pass unhandled mouse events to the window for dragging */
-      -webkit-app-region: drag;
+      padding: 10px;
     }
 
-    /* Interactive elements must opt OUT of drag */
-    button, a, input {
-      -webkit-app-region: no-drag;
-    }
-
-    #sentinel-panel {
-      background: rgba(20, 20, 22, 0.82);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      backdrop-filter: blur(20px) saturate(180%);
-      border-radius: 24px;
-      border: 1px solid rgba(255,255,255,0.10);
-      box-shadow:
-        0 24px 32px -8px rgba(0,0,0,0.45),
-        0 8px 12px -4px rgba(0,0,0,0.2),
-        inset 0 1px 0 rgba(255,255,255,0.06);
-      padding: 16px;
+    /* ── Panel ── */
+    #panel {
+      background: var(--black);
+      border: 1px solid var(--border-visible);
+      border-radius: 14px;
       display: flex;
-      gap: 10px;
-      align-items: flex-start;
-      min-width: 180px;
+      flex-direction: column;
+      min-width: 160px;
+      overflow: hidden;
     }
 
+    /* ── Panel header bar ── */
+    #panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    #panel-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+    }
+
+    #log-toggle {
+      -webkit-app-region: no-drag;
+      background: none;
+      border: 1px solid var(--border-visible);
+      border-radius: 4px;
+      color: var(--text-disabled);
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 3px 7px;
+      cursor: pointer;
+      transition: border-color 150ms ease-out, color 150ms ease-out;
+    }
+    #log-toggle:hover { border-color: var(--text-secondary); color: var(--text-secondary); }
+    #log-toggle.active { border-color: var(--text-primary); color: var(--text-primary); }
+
+    /* ── Body: cards + log ── */
+    #panel-body {
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* ── Agents ── */
     #agents-area {
       display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: flex-start;
+      flex-direction: row;
+      gap: 0;
+    }
+
+    /* Agent wrapper — handles show/hide */
+    .agent-wrap {
+      opacity: 1;
+      max-width: 200px;
+      overflow: hidden;
+      transition: opacity 400ms ease-out, max-width 400ms ease-out;
+    }
+    .agent-wrap.hidden {
+      opacity: 0;
+      max-width: 0;
     }
 
     /* ── Agent Card ── */
     .agent-card {
-      width: 148px;
-      padding: 14px 12px 12px;
-      border-radius: 16px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.07);
+      width: 156px;
+      padding: 14px 14px 12px;
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
+      gap: 10px;
+      -webkit-app-region: no-drag;
+      position: relative;
+    }
+
+    /* Top row: dot + name */
+    .card-top {
+      display: flex;
       align-items: center;
       gap: 8px;
-      transition: background 0.25s ease, border-color 0.25s ease;
-      -webkit-app-region: no-drag;
-    }
-    .agent-card:hover {
-      background: rgba(255,255,255,0.08);
     }
 
-    /* Approval ring pulse */
-    .status-needs_approval .agent-card {
-      border-color: var(--approval);
-      animation: ring-pulse 1.2s ease-out infinite;
-    }
-    @keyframes ring-pulse {
-      0%   { box-shadow: 0 0 0 0 rgba(255,59,48,0.5); }
-      70%  { box-shadow: 0 0 0 7px rgba(255,59,48,0); }
-      100% { box-shadow: 0 0 0 0 rgba(255,59,48,0); }
-    }
-
-    /* ── Avatar ── */
-    .avatar-wrap {
-      position: relative;
-      width: 56px; height: 56px;
-      flex-shrink: 0;
-    }
-
-    .avatar {
-      width: 56px; height: 56px;
-      border-radius: 50%;
-      background: var(--idle);
-      border: 2px solid rgba(255,255,255,0.12);
-      position: relative;
-      overflow: hidden;
-      transition: background 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    /* Eyes */
-    .avatar::before, .avatar::after {
-      content: '';
-      width: 5px; height: 5px;
-      background: rgba(0,0,0,0.55);
-      border-radius: 50%;
-      position: absolute;
-      top: 18px;
-    }
-    .avatar::before { left: 15px; }
-    .avatar::after  { right: 15px; }
-
-    /* Status dot */
     .status-dot {
-      position: absolute;
-      bottom: 1px; right: 1px;
-      width: 13px; height: 13px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: var(--idle);
-      border: 2px solid rgba(20,20,22,0.9);
-      box-shadow: 0 0 6px currentColor;
-      transition: background 0.3s ease;
+      flex-shrink: 0;
+      background: var(--text-disabled);
+      transition: background 300ms ease-out, box-shadow 300ms ease-out;
     }
 
-    /* Avatar colors per status */
-    .status-idle .avatar            { background: var(--idle); }
-    .status-thinking .avatar        { background: var(--thinking); box-shadow: 0 0 14px rgba(155,89,182,0.5); }
-    .status-working .avatar         { background: var(--working); box-shadow: 0 0 14px rgba(255,149,0,0.5); }
-    .status-needs_approval .avatar  { background: var(--approval); box-shadow: 0 0 18px rgba(255,59,48,0.6); }
-    .status-success .avatar         { background: var(--success); box-shadow: 0 0 14px rgba(52,199,89,0.5); }
-    .status-error .avatar,
-    .status-warning .avatar         { background: var(--warning); }
-
-    .status-idle .status-dot            { background: var(--idle); }
-    .status-thinking .status-dot        { background: var(--thinking); }
-    .status-working .status-dot         { background: var(--working); }
-    .status-needs_approval .status-dot  { background: var(--approval); }
-    .status-success .status-dot         { background: var(--success); }
-    .status-error .status-dot,
-    .status-warning .status-dot         { background: var(--warning); }
-
-    /* Avatar animations */
-    .status-idle .avatar            { animation: breathe 3s ease-in-out infinite; }
-    .status-thinking .avatar        { animation: pulse 2s ease-in-out infinite; }
-    .status-working .avatar         { animation: pulse 1s ease-in-out infinite; }
-    .status-needs_approval .avatar  { animation: shake 0.14s linear infinite; }
-    .status-success .avatar         { animation: pop 0.45s cubic-bezier(0.16,1,0.3,1) forwards; }
-
-    @keyframes breathe { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.04);opacity:1} }
-    @keyframes pulse   { 0%,100%{transform:scale(1)} 50%{transform:scale(1.07)} }
-    @keyframes shake   { 0%,100%{transform:rotate(0)} 33%{transform:rotate(4deg)} 66%{transform:rotate(-4deg)} }
-    @keyframes pop     { 0%{transform:scale(.88)} 55%{transform:scale(1.12)} 100%{transform:scale(1)} }
-
-    /* ── Text ── */
     .agent-name {
-      font-size: 9.5px;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: 1.4px;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.5);
-      text-align: center;
-      width: 100%;
+      color: var(--text-secondary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .agent-task {
-      font-size: 12px;
-      font-weight: 400;
-      color: rgba(255,255,255,0.82);
-      text-align: center;
-      line-height: 1.45;
-      word-break: break-word;
-      width: 100%;
-      min-height: 18px;
+    /* Status label */
+    .status-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-disabled);
+      transition: color 300ms ease-out;
     }
 
-    /* ── Approval Buttons ── */
+    /* Task text */
+    .task-text {
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--text-primary);
+      line-height: 1.45;
+      word-break: break-word;
+      min-height: 17px;
+    }
+
+    /* ── Dot colors per status ── */
+    .s-idle     .status-dot { background: var(--idle-color);     box-shadow: 0 0 6px var(--idle-color); }
+    .s-thinking .status-dot { background: var(--think-color);    box-shadow: 0 0 6px var(--think-color); animation: blink 1.4s ease-in-out infinite; }
+    .s-working  .status-dot { background: var(--work-color);     box-shadow: 0 0 6px var(--work-color);  animation: blink 0.7s ease-in-out infinite; }
+    .s-approval .status-dot { background: var(--approval-color); box-shadow: 0 0 8px var(--approval-color); animation: blink 0.35s ease-in-out infinite; }
+    .s-success  .status-dot { background: var(--success-color);  box-shadow: 0 0 8px var(--success-color); }
+    .s-error    .status-dot,
+    .s-warning  .status-dot { background: var(--warning);        box-shadow: 0 0 6px var(--warning); }
+
+    .s-idle     .status-label { color: var(--idle-color); }
+    .s-thinking .status-label { color: var(--think-color); }
+    .s-working  .status-label { color: var(--work-color); }
+    .s-approval .status-label { color: var(--approval-color); }
+    .s-success  .status-label { color: var(--success-color); }
+    .s-error    .status-label,
+    .s-warning  .status-label { color: var(--warning); }
+
+    /* Approval card left border */
+    .s-approval .agent-card {
+      border-left: 2px solid var(--approval-color);
+    }
+
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── Approval controls ── */
     .controls {
       display: none;
       gap: 6px;
-      width: 100%;
-      margin-top: 2px;
     }
-    .status-needs_approval .controls { display: flex; }
+    .s-approval .controls { display: flex; }
 
-    .btn-action {
+    .btn {
       flex: 1;
-      font-size: 11px;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
       font-weight: 700;
-      padding: 7px 0;
-      border: none;
-      border-radius: 10px;
-      color: #fff;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 6px 0;
+      border-radius: 4px;
       cursor: pointer;
-      letter-spacing: 0.2px;
-      transition: opacity 0.15s, transform 0.1s;
+      transition: opacity 150ms ease-out;
       -webkit-app-region: no-drag;
     }
-    .btn-action:hover  { opacity: 0.82; }
-    .btn-action:active { transform: scale(0.95); }
-    .approve { background: var(--success); }
-    .deny    { background: var(--approval); }
-
-    /* ── Log Toggle Button ── */
-    #toggle-history {
-      -webkit-app-region: no-drag;
-      flex-shrink: 0;
-      align-self: center;
-      width: 26px; height: 26px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.07);
-      border: none;
-      color: rgba(255,255,255,0.35);
-      font-size: 12px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, color 0.2s;
-      margin-left: 2px;
+    .btn:hover { opacity: 0.75; }
+    .btn:active { opacity: 0.55; }
+    .btn-approve {
+      background: transparent;
+      border: 1px solid var(--success);
+      color: var(--success);
     }
-    #toggle-history:hover { background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); }
+    .btn-deny {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
 
-    /* ── Log Panel ── */
+    /* ── Log panel ── */
     #log-panel {
       display: flex;
       flex-direction: column;
       max-width: 0;
       overflow: hidden;
       opacity: 0;
-      visibility: hidden;
-      transition: max-width 0.32s ease, opacity 0.25s ease, padding-left 0.32s ease;
-      padding-left: 0;
-      border-left: 1px solid transparent;
+      transition: max-width 300ms ease-out, opacity 250ms ease-out;
     }
-    #sentinel-panel.show-history #log-panel {
-      max-width: 300px;
+    #log-panel.open {
+      max-width: 280px;
       opacity: 1;
-      visibility: visible;
-      padding-left: 14px;
-      border-left-color: rgba(255,255,255,0.08);
     }
 
-    .log-title {
+    #log-inner {
+      width: 260px;
+      padding: 12px;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .log-header {
+      font-family: 'Space Mono', monospace;
       font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 2px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-      margin-bottom: 10px;
-      white-space: nowrap;
+      color: var(--text-disabled);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
     }
 
     #log-feed {
-      width: 260px;
-      max-height: 260px;
+      max-height: 220px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
-    #log-feed::-webkit-scrollbar { width: 3px; }
+    #log-feed::-webkit-scrollbar { width: 2px; }
     #log-feed::-webkit-scrollbar-track { background: transparent; }
-    #log-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+    #log-feed::-webkit-scrollbar-thumb { background: var(--border-visible); }
 
-    .log-entry {
-      font-size: 10.5px;
-      line-height: 1.4;
-      color: rgba(255,255,255,0.55);
-      padding: 5px 6px 5px 9px;
-      border-radius: 6px;
-      border-left: 2px solid transparent;
-      animation: fadeSlide 0.2s ease-out;
+    .log-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 4px 0;
+      border-bottom: 1px solid var(--border);
     }
-    .log-entry strong { color: rgba(255,255,255,0.78); }
-    .log-entry .time  { font-size: 9px; color: rgba(255,255,255,0.22); float: right; margin-left: 8px; }
+    .log-row:last-child { border-bottom: none; }
 
-    .log-entry.status-success       { border-left-color: var(--success); }
-    .log-entry.status-working       { border-left-color: var(--working); }
-    .log-entry.status-thinking      { border-left-color: var(--thinking); }
-    .log-entry.status-needs_approval,
-    .log-entry.status-error,
-    .log-entry.status-warning       { border-left-color: var(--approval); }
-    .log-entry.status-idle          { border-left-color: rgba(255,255,255,0.15); }
+    .log-indicator {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+      background: var(--text-disabled);
+    }
+    .log-row.ls-success  .log-indicator { background: var(--success); }
+    .log-row.ls-working  .log-indicator { background: var(--warning); }
+    .log-row.ls-thinking .log-indicator { background: var(--think-color); }
+    .log-row.ls-needs_approval .log-indicator { background: var(--accent); }
+    .log-row.ls-error,
+    .log-row.ls-warning  .log-indicator { background: var(--accent); }
 
-    @keyframes fadeSlide {
-      from { opacity:0; transform: translateY(-4px); }
-      to   { opacity:1; transform: translateY(0); }
+    .log-text {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+    .log-text strong { color: var(--text-primary); font-weight: 500; }
+
+    .log-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      color: var(--text-disabled);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
   </style>
 </head>
 <body>
-  <div id="sentinel-panel">
-    <div id="agents-area"></div>
-    <button id="toggle-history" onclick="toggleHistory()" title="Activity log">≡</button>
-    <div id="log-panel">
-      <div class="log-title">Activity</div>
-      <div id="log-feed"></div>
+  <div id="panel">
+    <div id="panel-header">
+      <span id="panel-title">Sentinel</span>
+      <button id="log-toggle" onclick="toggleLog()">Log</button>
+    </div>
+    <div id="panel-body">
+      <div id="agents-area"></div>
+      <div id="log-panel">
+        <div id="log-inner">
+          <div class="log-header">Activity</div>
+          <div id="log-feed"></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <script>
+    const IDLE_TIMEOUT = 120000; // 2 minutes
+
     let lastSessions = '';
     let lastHistory  = '';
     let eventSource  = null;
+    let hideTimers   = {};
 
-    function toggleHistory() {
-      document.getElementById('sentinel-panel').classList.toggle('show-history');
+    function toggleLog() {
+      const panel = document.getElementById('log-panel');
+      const btn   = document.getElementById('log-toggle');
+      const open  = panel.classList.toggle('open');
+      btn.classList.toggle('active', open);
     }
 
-    function makeCard(session) {
+    function statusClass(status) {
+      const map = {
+        idle:           's-idle',
+        thinking:       's-thinking',
+        working:        's-working',
+        needs_approval: 's-approval',
+        success:        's-success',
+        error:          's-error',
+        warning:        's-warning',
+      };
+      return map[status] || 's-idle';
+    }
+
+    function statusLabel(status) {
+      const map = {
+        idle:           'Ready',
+        thinking:       'Thinking',
+        working:        'Working',
+        needs_approval: 'Approval',
+        success:        'Done',
+        error:          'Error',
+        warning:        'Warning',
+      };
+      return map[status] || status;
+    }
+
+    function scheduleHide(id, timestamp) {
+      if (hideTimers[id]) clearTimeout(hideTimers[id]);
+      const age = Date.now() - timestamp;
+      const remaining = IDLE_TIMEOUT - age;
+      if (remaining <= 0) {
+        hideCard(id);
+      } else {
+        hideTimers[id] = setTimeout(() => hideCard(id), remaining);
+      }
+    }
+
+    function hideCard(id) {
+      const wrap = document.querySelector(`[data-session-id="${id}"]`);
+      if (wrap) wrap.classList.add('hidden');
+    }
+
+    function showCard(id) {
+      if (hideTimers[id]) clearTimeout(hideTimers[id]);
+      const wrap = document.querySelector(`[data-session-id="${id}"]`);
+      if (wrap) wrap.classList.remove('hidden');
+    }
+
+    function makeCard(s) {
       const wrap = document.createElement('div');
-      wrap.dataset.sessionId = session.id;
-      wrap.className = `status-${session.status}`;
+      wrap.className = 'agent-wrap';
+      wrap.dataset.sessionId = s.id;
 
       const card = document.createElement('div');
       card.className = 'agent-card';
 
-      const avatarWrap = document.createElement('div');
-      avatarWrap.className = 'avatar-wrap';
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
+      // Top: dot + name
+      const top = document.createElement('div');
+      top.className = 'card-top';
       const dot = document.createElement('div');
       dot.className = 'status-dot';
-      avatarWrap.appendChild(avatar);
-      avatarWrap.appendChild(dot);
-
       const name = document.createElement('div');
       name.className = 'agent-name';
-      name.textContent = session.name || session.id;
+      top.appendChild(dot);
+      top.appendChild(name);
 
+      // Status label
+      const label = document.createElement('div');
+      label.className = 'status-label';
+
+      // Task
       const task = document.createElement('div');
-      task.className = 'agent-task';
-      task.textContent = session.task;
+      task.className = 'task-text';
 
+      // Controls
       const controls = document.createElement('div');
       controls.className = 'controls';
-
       const approve = document.createElement('button');
-      approve.className = 'btn-action approve';
+      approve.className = 'btn btn-approve';
       approve.textContent = 'Approve';
-      approve.onclick = () => action(session.id, 'approve');
-
+      approve.onclick = () => action(s.id, 'approve');
       const deny = document.createElement('button');
-      deny.className = 'btn-action deny';
+      deny.className = 'btn btn-deny';
       deny.textContent = 'Deny';
-      deny.onclick = () => action(session.id, 'deny');
-
+      deny.onclick = () => action(s.id, 'deny');
       controls.appendChild(approve);
       controls.appendChild(deny);
-      card.appendChild(avatarWrap);
-      card.appendChild(name);
+
+      card.appendChild(top);
+      card.appendChild(label);
       card.appendChild(task);
       card.appendChild(controls);
       wrap.appendChild(card);
@@ -370,9 +456,8 @@
 
     function renderSessions(sessions) {
       const area = document.getElementById('agents-area');
-      const ids = new Set(Object.keys(sessions));
+      const ids  = new Set(Object.keys(sessions));
 
-      // Remove gone sessions
       area.querySelectorAll('[data-session-id]').forEach(el => {
         if (!ids.has(el.dataset.sessionId)) el.remove();
       });
@@ -383,9 +468,23 @@
           wrap = makeCard(s);
           area.appendChild(wrap);
         }
-        wrap.className = `status-${s.status}`;
-        wrap.querySelector('.agent-name').textContent = s.name || s.id;
-        wrap.querySelector('.agent-task').textContent = s.task;
+
+        // Update class
+        wrap.className = `agent-wrap ${statusClass(s.status)}`;
+
+        // Update content
+        wrap.querySelector('.agent-name').textContent  = s.name || s.id;
+        wrap.querySelector('.status-label').textContent = statusLabel(s.status);
+        wrap.querySelector('.task-text').textContent    = s.status === 'idle' ? '' : s.task;
+
+        // Show card on any activity, then re-schedule hide from idle
+        if (s.status === 'idle') {
+          // Start hide timer from last activity
+          scheduleHide(s.id, s.timestamp || Date.now());
+        } else {
+          // Active — always visible, cancel any pending hide
+          showCard(s.id);
+        }
       });
     }
 
@@ -393,17 +492,27 @@
       const feed = document.getElementById('log-feed');
       feed.innerHTML = '';
       history.forEach(h => {
-        const el = document.createElement('div');
-        el.className = `log-entry status-${h.status}`;
-        const time = document.createElement('span');
-        time.className = 'time';
+        const row = document.createElement('div');
+        row.className = `log-row ls-${h.status}`;
+
+        const ind = document.createElement('div');
+        ind.className = 'log-indicator';
+
+        const text = document.createElement('div');
+        text.className = 'log-text';
+        const strong = document.createElement('strong');
+        strong.textContent = (h.name || h.id) + ' ';
+        text.appendChild(strong);
+        text.appendChild(document.createTextNode(h.task));
+
+        const time = document.createElement('div');
+        time.className = 'log-time';
         time.textContent = h.time;
-        const bold = document.createElement('strong');
-        bold.textContent = (h.name || h.id) + ' ';
-        el.appendChild(time);
-        el.appendChild(bold);
-        el.appendChild(document.createTextNode(h.task));
-        feed.appendChild(el);
+
+        row.appendChild(ind);
+        row.appendChild(text);
+        row.appendChild(time);
+        feed.appendChild(row);
       });
     }
 
@@ -413,7 +522,8 @@
       eventSource.addEventListener('update', e => {
         try {
           const { sessions, history } = JSON.parse(e.data);
-          const ss = JSON.stringify(sessions), hs = JSON.stringify(history);
+          const ss = JSON.stringify(sessions);
+          const hs = JSON.stringify(history);
           if (ss !== lastSessions) { lastSessions = ss; renderSessions(sessions); }
           if (hs !== lastHistory)  { lastHistory  = hs; renderHistory(history); }
         } catch(_) {}
