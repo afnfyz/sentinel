@@ -448,10 +448,11 @@
       // Name label
       slot.querySelector('.mascot-label').textContent = (s.name || s.id).toUpperCase();
 
-      // Popover header
-      slot.querySelector('.popover-title').textContent = (s.name || s.id).toUpperCase();
-      const taskEl = slot.querySelector('.popover-task');
-      taskEl.textContent = (s.status !== 'idle' && s.task) ? s.task : '';
+      // Update shared popover header if it's open for this slot
+      if (openLog === s.id) {
+        document.querySelector('#log-popover .popover-title').textContent = (s.name || s.id).toUpperCase();
+        document.querySelector('#log-popover .popover-task').textContent  = (s.status !== 'idle' && s.task) ? s.task : '';
+      }
 
       // Auto-hide logic
       if (s.status === 'idle') {

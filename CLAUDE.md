@@ -8,7 +8,7 @@ Sentinel is a floating macOS dashboard that monitors AI CLI agent activity (Gemi
 
 Components:
 1. **`server.js`** — Express HTTP bridge (port 49152) that receives agent status updates, serves SSE to the UI, and manages session lifecycle
-2. **`index.html`** — Frontend dashboard (SSE-based) showing agent cards with status animations and a toggleable event log
+2. **`index.html`** — Frontend UI (SSE-based) showing animated blob mascots per agent (blue for Gemini, orange for Claude). Drag mascot to move window. Tap mascot to open activity log popover. Approve/Deny buttons appear above mascot when approval is needed.
 3. **`Sentinel.swift`** — macOS native app that wraps `index.html` in a floating borderless `WKWebView` window
 4. **`GeminiSentinel.app/`** — Proper macOS `.app` bundle (required for `open` to launch without spawning a terminal)
 5. **`extension/`** — Gemini CLI extension that installs hooks globally via `gemini extensions link`
@@ -69,6 +69,9 @@ The hook scripts that implement this are `install/sentinel-before-tool.sh` (Gemi
 
 - State is persisted to `state.json` on every update and reloaded on server start. Stale sessions from previous runs are cleaned up by the auto-clear timers.
 - The Swift app uses `hidesOnDeactivate = false` and `alphaValue = 1.0` to stay fully visible regardless of which app has focus.
+- The Swift app intentionally does NOT call `NSApp.activate` on launch or during normal operation — it only steals focus when a session enters `needs_approval` status. This prevents the mascot from interrupting the user's active window.
+- The mascot figure uses `-webkit-app-region: drag` so the whole mascot can be dragged to reposition. Tap detection uses `mousedown`/`mouseup` distance check (< 6px) since WKWebView swallows `click` events on drag regions.
+- The log popover is a single shared `position: fixed` element positioned by JS (`getBoundingClientRect`) so it never gets clipped by the window bounds.
 - The `.app` bundle has `LSUIElement = true` in `Info.plist` so `open` launches it with no Dock icon and no terminal window.
 - The Swift app hardcodes the HTML path to `/Users/afnan_dfx/projects/gemini-sentinel/index.html` — changing the project location requires updating `Sentinel.swift` and recompiling.
 - Gemini CLI only runs hooks from project-level `.gemini/settings.json` (not user-level `~/.gemini/settings.json`). The extension approach bypasses this limitation.

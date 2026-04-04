@@ -50,8 +50,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let url = URL(fileURLWithPath: path)
         webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
 
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        window.orderFront(nil)
+        // Do NOT activate — we never steal focus from the user's active app
 
         // Start server and watch it — restart if it goes down, poll for approvals
         startServerIfNeeded()
@@ -97,13 +97,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 .contains { ($0["status"] as? String) == "needs_approval" }
             if needsApproval {
                 DispatchQueue.main.async {
-                    self?.window.level = .screenSaver  // float above everything including VS Code
-                    self?.window.makeKeyAndOrderFront(nil)
+                    self?.window.level = .screenSaver  // float above VS Code for approval
+                    self?.window.orderFront(nil)
+                    // Only activate (steal focus) when approval is needed
                     NSApp.activate(ignoringOtherApps: true)
                 }
             } else {
                 DispatchQueue.main.async {
                     self?.window.level = .floating
+                    // Never take focus away from user's active app
                 }
             }
         }.resume()
