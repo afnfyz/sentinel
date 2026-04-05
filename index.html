@@ -28,7 +28,8 @@
       gap: 12px;
     }
 
-    /* ── Each mascot slot ── */
+    /* ── Each mascot slot — pointer-events:none so the window background
+         receives mouse events for native drag (isMovableByWindowBackground) ── */
     .mascot-slot {
       display: flex;
       flex-direction: column;
@@ -37,6 +38,7 @@
       position: relative;
       opacity: 1;
       transition: opacity 500ms ease-out;
+      pointer-events: none;
     }
     .mascot-slot.hidden {
       opacity: 0;
@@ -187,6 +189,7 @@
       white-space: nowrap;
     }
     .s-approval .approval-btns { display: flex; pointer-events: auto; }
+    .abtn { pointer-events: auto; }
 
     .abtn {
       font-family: 'Space Mono', monospace;
@@ -234,7 +237,7 @@
     }
     #log-popover.open {
       opacity: 1;
-      pointer-events: auto !important;
+      pointer-events: auto;
       transform: scale(1);
     }
 
