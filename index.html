@@ -178,7 +178,49 @@
       to   { transform: rotate(360deg); }
     }
 
-    /* ── Approval buttons (show on hover when needs_approval) ── */
+    /* ── Thought bubble: shows what needs approval ── */
+    .thought-bubble {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10,10,10,0.92);
+      border: 1px solid rgba(215,25,33,0.5);
+      border-radius: 10px;
+      padding: 6px 10px;
+      white-space: nowrap;
+      max-width: 200px;
+      white-space: normal;
+      text-align: center;
+      pointer-events: none;
+    }
+    .thought-bubble::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: rgba(215,25,33,0.5);
+    }
+    .thought-bubble-text {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 11px;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.3;
+    }
+    .thought-bubble-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(215,25,33,0.8);
+      margin-bottom: 2px;
+    }
+    .s-approval .thought-bubble { display: block; }
+
+    /* ── Approval buttons ── */
     .approval-btns {
       display: none;
       position: absolute;
@@ -187,6 +229,17 @@
       transform: translateX(-50%);
       gap: 5px;
       white-space: nowrap;
+    }
+    /* When approval: show thought bubble above, buttons at bottom */
+    .s-approval .thought-bubble {
+      bottom: auto;
+      top: calc(100% + 6px);
+    }
+    .s-approval .thought-bubble::after {
+      top: auto;
+      bottom: 100%;
+      border-top-color: transparent;
+      border-bottom-color: rgba(215,25,33,0.5);
     }
     .s-approval .approval-btns { display: flex; pointer-events: auto; }
     .abtn { pointer-events: auto; }
@@ -419,9 +472,13 @@
           <div class="mascot-figure">
             <div class="mascot-ring"></div>
             ${buildMascotSVG(s.id, s.name)}
+            <div class="thought-bubble">
+              <div class="thought-bubble-label">Allow?</div>
+              <div class="thought-bubble-text"></div>
+            </div>
             <div class="approval-btns">
-              <button class="abtn abtn-approve">OK</button>
-              <button class="abtn abtn-deny">No</button>
+              <button class="abtn abtn-approve">✓ Yes</button>
+              <button class="abtn abtn-deny">✕ No</button>
             </div>
           </div>
           <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
@@ -442,6 +499,10 @@
 
       // Name label
       slot.querySelector('.mascot-label').textContent = (s.name || s.id).toUpperCase();
+
+      // Thought bubble — show task context during approval
+      const bubble = slot.querySelector('.thought-bubble-text');
+      if (bubble) bubble.textContent = s.task || '';
 
       // Update shared popover header if it's open for this slot
       if (openLog === s.id) {
@@ -612,7 +673,7 @@
     document.addEventListener('mouseup', e => {
       const dt = Date.now() - _tapTime;
       const dist = Math.hypot(e.clientX - _tapX, e.clientY - _tapY);
-      if (dt > 300 || dist > 8) return; // was a drag or long-press
+      if (dt > 400 || dist > 10) return; // was a drag or long-press
 
       // Check if tap landed inside the log popover
       const popover = document.getElementById('log-popover');

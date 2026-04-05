@@ -154,9 +154,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
         case .changed:
             guard let offset = dragStart else { return }
-            // Only move if actually dragging (not a micro-movement from a click)
+            // Require 10px of movement before engaging drag, so taps don't move window
             let translation = gr.translation(in: nil)
-            if abs(translation.x) < 4 && abs(translation.y) < 4 { return }
+            if abs(translation.x) < 10 && abs(translation.y) < 10 { return }
             let screenLoc = window.convertPoint(toScreen: loc)
             let newOrigin = NSPoint(
                 x: screenLoc.x - offset.x,
