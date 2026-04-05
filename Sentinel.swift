@@ -4,45 +4,117 @@ import WebKit
 class SentinelWindow: NSWindow {
     override var canBecomeKey: Bool { return true }
     override var canBecomeMain: Bool { return true }
-
-    // WKWebView intercepts mouse events and blocks isMovableByWindowBackground.
-    // Override mouseDown to initiate window drag directly whenever WKWebView
-    // passes an unhandled mouseDown up the responder chain.
-    override func mouseDown(with event: NSEvent) {
-        performDrag(with: event)
-    }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var window: SentinelWindow!
     var webView: WKWebView!
     var statusItem: NSStatusItem!
     var serverProcess: Process?
     var watchTimer: Timer?
+    var dragStart: NSPoint?
 
     let sentinelDir = "/Users/afnan_dfx/projects/gemini-sentinel"
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        setupStatusBar()
+        setupWindow()
+        setupDrag()
+        startServerIfNeeded()
+        watchTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.startServerIfNeeded()
+            self?.checkForApproval()
+        }
+    }
+
+    // MARK: – Status bar
+
+    func setupStatusBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.title = "♊️"
+            // SF Symbol eye — represents "watching your agents"
+            if let img = NSImage(systemSymbolName: "eye.fill", accessibilityDescription: "Sentinel") {
+                img.size = NSSize(width: 16, height: 16)
+                img.isTemplate = true   // adapts to light/dark menu bar
+                button.image = img
+            } else {
+                button.title = "👁"
+            }
+            button.action = #selector(statusBarClicked(_:))
+            button.target = self
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
+    }
 
+    @objc func statusBarClicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent!
+        if event.type == .rightMouseUp || event.modifierFlags.contains(.control) {
+            showMenu()
+        } else {
+            // Left click — toggle window visibility
+            if window.isVisible {
+                window.orderOut(nil)
+            } else {
+                window.orderFront(nil)
+            }
+        }
+    }
+
+    func showMenu() {
+        let menu = NSMenu()
+        menu.delegate = self
+
+        let toggleItem = NSMenuItem(
+            title: window.isVisible ? "Hide Sentinel" : "Show Sentinel",
+            action: #selector(toggleWindow),
+            keyEquivalent: ""
+        )
+        toggleItem.target = self
+        menu.addItem(toggleItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let quitItem = NSMenuItem(title: "Quit Sentinel", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+
+        statusItem.menu = menu
+        statusItem.button?.performClick(nil)
+        statusItem.menu = nil  // remove so next left-click is handled by action
+    }
+
+    @objc func toggleWindow() {
+        if window.isVisible { window.orderOut(nil) } else { window.orderFront(nil) }
+    }
+
+    @objc func quitApp() {
+        serverProcess?.terminate()
+        NSApp.terminate(nil)
+    }
+
+    // MARK: – Window
+
+    func setupWindow() {
         let width: CGFloat = 400
         let height: CGFloat = 200
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
-        let rect = NSRect(x: screenRect.minX + 20,
-                        y: screenRect.minY + 20,
-                        width: width, height: height)
+        let rect = NSRect(
+            x: screenRect.maxX - width - 20,
+            y: screenRect.minY + 20,
+            width: width, height: height
+        )
 
-        window = SentinelWindow(contentRect: rect,
-                              styleMask: [.borderless],
-                              backing: .buffered, defer: false)
+        window = SentinelWindow(
+            contentRect: rect,
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
         window.level = .floating
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
-        window.isMovableByWindowBackground = true
+        window.isMovableByWindowBackground = false  // we handle drag manually
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.alphaValue = 1.0
         window.hidesOnDeactivate = false
@@ -54,19 +126,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView?.addSubview(webView)
 
         let path = "\(sentinelDir)/index.html"
-        let url = URL(fileURLWithPath: path)
-        webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        webView.loadFileURL(
+            URL(fileURLWithPath: path),
+            allowingReadAccessTo: URL(fileURLWithPath: sentinelDir)
+        )
 
         window.orderFront(nil)
-        // Do NOT activate — we never steal focus from the user's active app
+    }
 
-        // Start server and watch it — restart if it goes down, poll for approvals
-        startServerIfNeeded()
-        watchTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            self?.startServerIfNeeded()
-            self?.checkForApproval()
+    // MARK: – Drag (pan gesture on the WKWebView)
+
+    func setupDrag() {
+        let pan = NSPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        // Low priority so WKWebView button clicks still fire first
+        pan.delaysPrimaryMouseButtonEvents = false
+        webView.addGestureRecognizer(pan)
+    }
+
+    @objc func handlePan(_ gr: NSPanGestureRecognizer) {
+        let loc = gr.location(in: nil)   // location in window coords
+        switch gr.state {
+        case .began:
+            let screenLoc = window.convertPoint(toScreen: loc)
+            dragStart = NSPoint(
+                x: screenLoc.x - window.frame.origin.x,
+                y: screenLoc.y - window.frame.origin.y
+            )
+        case .changed:
+            guard let offset = dragStart else { return }
+            // Only move if actually dragging (not a micro-movement from a click)
+            let translation = gr.translation(in: nil)
+            if abs(translation.x) < 4 && abs(translation.y) < 4 { return }
+            let screenLoc = window.convertPoint(toScreen: loc)
+            let newOrigin = NSPoint(
+                x: screenLoc.x - offset.x,
+                y: screenLoc.y - offset.y
+            )
+            window.setFrameOrigin(newOrigin)
+        case .ended, .cancelled, .failed:
+            dragStart = nil
+        default:
+            break
         }
     }
+
+    // MARK: – Server
 
     func isServerRunning() -> Bool {
         let task = Process()
@@ -102,17 +206,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                   let sessions = json["sessions"] as? [String: Any] else { return }
             let needsApproval = sessions.values.compactMap { $0 as? [String: Any] }
                 .contains { ($0["status"] as? String) == "needs_approval" }
-            if needsApproval {
-                DispatchQueue.main.async {
-                    self?.window.level = .screenSaver  // float above VS Code for approval
+            DispatchQueue.main.async {
+                if needsApproval {
+                    self?.window.level = .screenSaver
                     self?.window.orderFront(nil)
-                    // Only activate (steal focus) when approval is needed
                     NSApp.activate(ignoringOtherApps: true)
-                }
-            } else {
-                DispatchQueue.main.async {
+                } else {
                     self?.window.level = .floating
-                    // Never take focus away from user's active app
                 }
             }
         }.resume()
@@ -129,8 +229,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory) // No Dock icon, but stays active
-// Must be a global — NSApplication.delegate is weak, a local var gets deallocated
+app.setActivationPolicy(.accessory)
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()
