@@ -12,7 +12,8 @@ if [ -f "$CONFIG_FILE" ]; then
   DESTRUCTIVE=$(python3 -c "
 import sys, json
 try:
-    cfg = json.load(open('$CONFIG_FILE'))
+    with open('$CONFIG_FILE') as f:
+        cfg = json.load(f)
     tools = cfg.get('destructiveTools', [])
     gate_shell = cfg.get('gateShellCommands', False)
     if gate_shell:

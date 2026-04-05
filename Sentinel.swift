@@ -22,14 +22,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Project directory: computed relative to the executable so it works on any machine.
     // Executable lives at: <project>/GeminiSentinel.app/Contents/MacOS/GeminiSentinel
     // Walking up three levels gives the project root.
+    // Falls back to the executable's directory if server.js is not found at the expected path.
     var sentinelDir: String {
         let execURL = URL(fileURLWithPath: CommandLine.arguments[0])
-        return execURL
+        let candidate = execURL
             .deletingLastPathComponent()  // MacOS/
             .deletingLastPathComponent()  // Contents/
             .deletingLastPathComponent()  // GeminiSentinel.app/
             .deletingLastPathComponent()  // project root
-            .path
+        // Validate the resolved path actually contains server.js
+        let serverJS = candidate.appendingPathComponent("server.js").path
+        if FileManager.default.fileExists(atPath: serverJS) {
+            return candidate.path
+        }
+        // Fallback: executable's own directory (e.g. running binary directly during dev)
+        let fallback = execURL.deletingLastPathComponent()
+        print("[Sentinel] Warning: server.js not found at expected bundle path \(candidate.path). Falling back to \(fallback.path)")
+        return fallback.path
     }
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
@@ -176,7 +185,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         process.arguments = ["node", "\(dir)/server.js"]
         process.currentDirectoryURL = URL(fileURLWithPath: dir)
         let logURL = URL(fileURLWithPath: "\(dir)/server.log")
-        // Create log file if it doesn't exist so FileHandle can open it
+        // Ensure parent directory exists and create log file if needed
+        let logDir = logURL.deletingLastPathComponent().path
+        try? FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: logURL.path) {
             let created = FileManager.default.createFile(atPath: logURL.path, contents: nil)
             if !created { print("[Sentinel] Warning: could not create \(logURL.path)") }

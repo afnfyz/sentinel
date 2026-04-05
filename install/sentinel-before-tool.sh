@@ -17,7 +17,8 @@ if [ -f "$CONFIG_FILE" ]; then
   DESTRUCTIVE_PATTERN=$(python3 -c "
 import sys, json, re
 try:
-    cfg = json.load(open('$CONFIG_FILE'))
+    with open('$CONFIG_FILE') as f:
+        cfg = json.load(f)
     tools = cfg.get('destructiveTools', [])
     gate_shell = cfg.get('gateShellCommands', False)
     if gate_shell:
@@ -40,7 +41,8 @@ else
 fi
 echo "[$(date '+%H:%M:%S')] [gemini] tool=$tool_name input=$tool_input" >> "$SENTINEL_LOG" 2>/dev/null || true
 
-if ! echo "$tool_name" | grep -qiE "^($DESTRUCTIVE_PATTERN)$"; then
+# Use exact (case-sensitive) matching — tool names in the pattern are already correctly cased
+if ! echo "$tool_name" | grep -qE "^($DESTRUCTIVE_PATTERN)$"; then
   curl -s -X POST http://localhost:49152/update \
     -H 'Content-Type: application/json' \
     -d "{\"id\":\"main\",\"name\":\"Gemini\",\"status\":\"working\",\"task\":\"Running: $tool_name\"}" > /dev/null
