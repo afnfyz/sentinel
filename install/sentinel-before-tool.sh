@@ -4,9 +4,45 @@ input=$(cat)
 tool_name=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_name','tool'))" 2>/dev/null || echo "tool")
 tool_input=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); inp=d.get('tool_input',{}); print(str(inp)[:120])" 2>/dev/null || echo "")
 
-# Let read-only tools through immediately
-DESTRUCTIVE="write_file|replace|edit_file|run_shell_command|bash|delete|move|create|overwrite|execute|computer_use"
-if ! echo "$tool_name" | grep -qiE "$DESTRUCTIVE"; then
+# ── Config file: ~/.sentinel/config.json ──────────────────────────────────────
+# Example:
+#   {
+#     "destructiveTools": ["write_file","replace","edit_file","delete","move","create","overwrite"],
+#     "gateShellCommands": false
+#   }
+# Default: only gate file-mutation tools; do NOT gate bash/shell commands.
+CONFIG_FILE="$HOME/.sentinel/config.json"
+
+if [ -f "$CONFIG_FILE" ]; then
+  DESTRUCTIVE_PATTERN=$(python3 -c "
+import sys, json, re
+try:
+    with open('$CONFIG_FILE') as f:
+        cfg = json.load(f)
+    tools = cfg.get('destructiveTools', [])
+    gate_shell = cfg.get('gateShellCommands', False)
+    if gate_shell:
+        tools = tools + ['bash','run_shell_command','execute','computer_use']
+    print('|'.join(re.escape(t) for t in tools) if tools else 'NOMATCH_SENTINEL')
+except Exception:
+    print('write_file|replace|edit_file|delete|move|create|overwrite')
+" 2>/dev/null || echo "write_file|replace|edit_file|delete|move|create|overwrite")
+else
+  # Default: file-mutation tools only — bash and shell commands are NOT gated
+  DESTRUCTIVE_PATTERN="write_file|replace|edit_file|delete|move|create|overwrite"
+fi
+
+# Log tool call to server.log for debugging — use SENTINEL_DIR if set, else ~/.sentinel/
+if [ -n "$SENTINEL_DIR" ] && [ -d "$SENTINEL_DIR" ]; then
+  SENTINEL_LOG="$SENTINEL_DIR/server.log"
+else
+  mkdir -p "$HOME/.sentinel"
+  SENTINEL_LOG="$HOME/.sentinel/server.log"
+fi
+echo "[$(date '+%H:%M:%S')] [gemini] tool=$tool_name input=$tool_input" >> "$SENTINEL_LOG" 2>/dev/null || true
+
+# Use exact (case-sensitive) matching — tool names in the pattern are already correctly cased
+if ! echo "$tool_name" | grep -qE "^($DESTRUCTIVE_PATTERN)$"; then
   curl -s -X POST http://localhost:49152/update \
     -H 'Content-Type: application/json' \
     -d "{\"id\":\"main\",\"name\":\"Gemini\",\"status\":\"working\",\"task\":\"Running: $tool_name\"}" > /dev/null
@@ -38,11 +74,13 @@ if [ -n "$TERMINAL_INPUT" ]; then
     curl -s -X POST http://localhost:49152/action \
       -H 'Content-Type: application/json' \
       -d '{"id":"main","action":"deny"}' > /dev/null
+    echo "[$(date '+%H:%M:%S')] [gemini] DENIED $tool_name (terminal)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"deny","reason":"Denied from terminal."}'
   else
     curl -s -X POST http://localhost:49152/action \
       -H 'Content-Type: application/json' \
       -d '{"id":"main","action":"approve"}' > /dev/null
+    echo "[$(date '+%H:%M:%S')] [gemini] APPROVED $tool_name (terminal)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"allow"}'
   fi
 else
@@ -52,10 +90,13 @@ else
   MASCOT_ACTION=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('action','timeout'))" 2>/dev/null || echo "timeout")
 
   if [ "$MASCOT_ACTION" = "approve" ]; then
+    echo "[$(date '+%H:%M:%S')] [gemini] APPROVED $tool_name (mascot)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"allow"}'
   elif [ "$MASCOT_ACTION" = "deny" ]; then
+    echo "[$(date '+%H:%M:%S')] [gemini] DENIED $tool_name (mascot)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"deny","reason":"Denied from Sentinel."}'
   else
+    echo "[$(date '+%H:%M:%S')] [gemini] TIMEOUT $tool_name (auto-allow)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"allow"}'
   fi
 fi

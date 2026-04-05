@@ -30,7 +30,7 @@
         {
           "type": "command",
           "command": "~/.claude/hooks/sentinel-pre-tool.sh",
-          "async": true
+          "async": false
         }
       ]
     }

@@ -2,7 +2,28 @@
 
 echo '{}'
 
-SENTINEL_DIR="/Users/afnan_dfx/projects/gemini-sentinel"
+# Resolve project dir from this script's installed location.
+# Installed hooks live at: ~/.gemini/hooks/sentinel-session-start.sh
+# The project root is stored in SENTINEL_DIR env var, or we fall back to
+# looking alongside the script for a server.js file.
+if [ -z "$SENTINEL_DIR" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  # Walk up from script location looking for server.js (up to 5 levels)
+  SEARCH_DIR="$SCRIPT_DIR"
+  for _ in $(seq 5); do
+    if [ -f "$SEARCH_DIR/server.js" ]; then
+      SENTINEL_DIR="$SEARCH_DIR"
+      break
+    fi
+    PARENT="$(dirname "$SEARCH_DIR")"
+    [ "$PARENT" = "$SEARCH_DIR" ] && break  # reached filesystem root
+    SEARCH_DIR="$PARENT"
+  done
+  if [ -z "$SENTINEL_DIR" ]; then
+    echo "[sentinel-session-start] ERROR: Cannot find server.js. Set SENTINEL_DIR env var to your sentinel project path." >&2
+    exit 1
+  fi
+fi
 
 (
   # Start server if not running

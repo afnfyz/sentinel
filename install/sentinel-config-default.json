@@ -1,0 +1,16 @@
+{
+  "_comment": "Copy this to ~/.sentinel/config.json to customize Sentinel's approval behavior.",
+  "destructiveTools": [
+    "write_file",
+    "replace",
+    "edit_file",
+    "delete",
+    "move",
+    "create",
+    "overwrite",
+    "Write",
+    "Edit",
+    "NotebookEdit"
+  ],
+  "gateShellCommands": false
+}
