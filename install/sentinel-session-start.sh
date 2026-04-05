@@ -15,8 +15,8 @@ if [ -z "$SENTINEL_DIR" ]; then
   elif [ -f "$SCRIPT_DIR/../../server.js" ]; then
     SENTINEL_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
   else
-    # Last resort: use HOME-relative default install location
-    SENTINEL_DIR="$HOME/projects/gemini-sentinel"
+    echo "[sentinel-session-start] ERROR: Cannot find server.js. Set SENTINEL_DIR env var to your sentinel project path." >&2
+    exit 1
   fi
 fi
 

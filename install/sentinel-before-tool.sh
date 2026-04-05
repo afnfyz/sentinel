@@ -31,9 +31,14 @@ else
   DESTRUCTIVE_PATTERN="write_file|replace|edit_file|delete|move|create|overwrite"
 fi
 
-# Log tool call to server.log for debugging
-LOG_DIR="$(dirname "$0")/../.."
-echo "[$(date '+%H:%M:%S')] [gemini] tool=$tool_name input=$tool_input" >> "$LOG_DIR/server.log" 2>/dev/null || true
+# Log tool call to server.log for debugging — use SENTINEL_DIR if set, else ~/.sentinel/
+if [ -n "$SENTINEL_DIR" ] && [ -d "$SENTINEL_DIR" ]; then
+  SENTINEL_LOG="$SENTINEL_DIR/server.log"
+else
+  mkdir -p "$HOME/.sentinel"
+  SENTINEL_LOG="$HOME/.sentinel/server.log"
+fi
+echo "[$(date '+%H:%M:%S')] [gemini] tool=$tool_name input=$tool_input" >> "$SENTINEL_LOG" 2>/dev/null || true
 
 if ! echo "$tool_name" | grep -qiE "^($DESTRUCTIVE_PATTERN)$"; then
   curl -s -X POST http://localhost:49152/update \
@@ -67,13 +72,13 @@ if [ -n "$TERMINAL_INPUT" ]; then
     curl -s -X POST http://localhost:49152/action \
       -H 'Content-Type: application/json' \
       -d '{"id":"main","action":"deny"}' > /dev/null
-    echo "[$(date '+%H:%M:%S')] [gemini] DENIED $tool_name (terminal)" >> "$LOG_DIR/server.log" 2>/dev/null || true
+    echo "[$(date '+%H:%M:%S')] [gemini] DENIED $tool_name (terminal)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"deny","reason":"Denied from terminal."}'
   else
     curl -s -X POST http://localhost:49152/action \
       -H 'Content-Type: application/json' \
       -d '{"id":"main","action":"approve"}' > /dev/null
-    echo "[$(date '+%H:%M:%S')] [gemini] APPROVED $tool_name (terminal)" >> "$LOG_DIR/server.log" 2>/dev/null || true
+    echo "[$(date '+%H:%M:%S')] [gemini] APPROVED $tool_name (terminal)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"allow"}'
   fi
 else
@@ -83,13 +88,13 @@ else
   MASCOT_ACTION=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('action','timeout'))" 2>/dev/null || echo "timeout")
 
   if [ "$MASCOT_ACTION" = "approve" ]; then
-    echo "[$(date '+%H:%M:%S')] [gemini] APPROVED $tool_name (mascot)" >> "$LOG_DIR/server.log" 2>/dev/null || true
+    echo "[$(date '+%H:%M:%S')] [gemini] APPROVED $tool_name (mascot)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"allow"}'
   elif [ "$MASCOT_ACTION" = "deny" ]; then
-    echo "[$(date '+%H:%M:%S')] [gemini] DENIED $tool_name (mascot)" >> "$LOG_DIR/server.log" 2>/dev/null || true
+    echo "[$(date '+%H:%M:%S')] [gemini] DENIED $tool_name (mascot)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"deny","reason":"Denied from Sentinel."}'
   else
-    echo "[$(date '+%H:%M:%S')] [gemini] TIMEOUT $tool_name (auto-allow)" >> "$LOG_DIR/server.log" 2>/dev/null || true
+    echo "[$(date '+%H:%M:%S')] [gemini] TIMEOUT $tool_name (auto-allow)" >> "$SENTINEL_LOG" 2>/dev/null || true
     echo '{"decision":"allow"}'
   fi
 fi

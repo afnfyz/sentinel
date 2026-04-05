@@ -178,7 +178,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let logURL = URL(fileURLWithPath: "\(dir)/server.log")
         // Create log file if it doesn't exist so FileHandle can open it
         if !FileManager.default.fileExists(atPath: logURL.path) {
-            FileManager.default.createFile(atPath: logURL.path, contents: nil)
+            let created = FileManager.default.createFile(atPath: logURL.path, contents: nil)
+            if !created { print("[Sentinel] Warning: could not create \(logURL.path)") }
         }
         if let logHandle = try? FileHandle(forWritingTo: logURL) {
             logHandle.seekToEndOfFile()
