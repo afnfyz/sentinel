@@ -1,93 +1,73 @@
 #!/usr/bin/env bash
+# Sentinel PreToolUse hook.
+# - Always returns allow (never blocks Claude Code).
+# - Shows "needs_approval" on mascot when Claude Code will prompt the user,
+#   so the mascot reflects what VS Code is showing.
+# - Shows "working" for pre-approved tools.
 
 input=$(cat)
 tool_name=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_name','tool'))" 2>/dev/null || echo "tool")
-
-# Extract a short description of what the tool is doing for display in the mascot
 tool_context=$(echo "$input" | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
 inp = d.get('tool_input', {})
 name = d.get('tool_name', '')
-if name == 'Write':
-    print(inp.get('file_path', '?').split('/')[-1])
-elif name == 'Edit':
-    print(inp.get('file_path', '?').split('/')[-1])
+if name in ('Write', 'Edit'):
+    print(inp.get('file_path', '').split('/')[-1])
+elif name == 'Bash':
+    print(inp.get('command', '')[:50])
 elif name == 'NotebookEdit':
-    print(inp.get('notebook_path', '?').split('/')[-1])
+    print(inp.get('notebook_path', '').split('/')[-1])
 else:
     print('')
 " 2>/dev/null || echo "")
 
-# Only Write (new file creation) needs mascot approval.
-# Edit is handled by Claude Code's own "Edit automatically" permission system.
-# NotebookEdit similarly.
-case "$tool_name" in
-  Write)
-    DESTRUCTIVE=1
-    ;;
-  *)
-    DESTRUCTIVE=0
-    ;;
-esac
+DISPLAY_TASK="${tool_name}${tool_context:+: $tool_context}"
 
-if [ "$DESTRUCTIVE" -eq 0 ]; then
-  curl -s -X POST http://localhost:49152/update \
-    -H 'Content-Type: application/json' \
-    -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"working\",\"task\":\"Running: $tool_name\"}" > /dev/null
-  echo '{"decision":"allow"}'
-  exit 0
-fi
+# Read Claude Code's allow list to check if this tool needs user approval.
+# If it's NOT pre-approved, Claude Code will show a VS Code dialog — mirror that on mascot.
+NEEDS_APPROVAL=$(python3 - "$tool_name" "$tool_context" << 'PYEOF'
+import sys, json, re
 
-# Build display task with context
-if [ -n "$tool_context" ]; then
-  DISPLAY_TASK="$tool_name: $tool_context"
+tool_name = sys.argv[1]
+tool_context = sys.argv[2] if len(sys.argv) > 2 else ''
+
+try:
+    with open('/Users/afnan_dfx/.claude/settings.json') as f:
+        settings = json.load(f)
+    allow = settings.get('permissions', {}).get('allow', [])
+except:
+    print('0')
+    sys.exit()
+
+# Build the full command string Claude Code would match against
+if tool_name == 'Bash':
+    candidate = f'Bash({tool_context})'
+else:
+    candidate = tool_name
+
+def matches(pattern, candidate):
+    # Claude Code uses glob-style: Bash(git *) matches Bash(git push origin main)
+    p = re.escape(pattern).replace(r'\*', '.*')
+    return bool(re.fullmatch(p, candidate))
+
+for rule in allow:
+    if matches(rule, candidate):
+        print('0')
+        sys.exit()
+
+print('1')
+PYEOF
+)
+
+if [ "$NEEDS_APPROVAL" = "1" ]; then
+  STATUS="needs_approval"
 else
-  DISPLAY_TASK="$tool_name"
+  STATUS="working"
 fi
 
-# Set mascot to needs_approval with context
 curl -s -X POST http://localhost:49152/update \
   -H 'Content-Type: application/json' \
-  -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"needs_approval\",\"task\":\"$DISPLAY_TASK\"}" > /dev/null
+  -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"$STATUS\",\"task\":\"$DISPLAY_TASK\"}" > /dev/null &
 
-# Start the long-poll
-curl -s --max-time 31 "http://localhost:49152/wait-approval?id=claude" > /tmp/sentinel-approval-claude &
-CURL_PID=$!
-
-# Try terminal prompt (silent in VS Code)
-TERMINAL_INPUT=""
-if [ -t 0 ] || [ -e /dev/tty ]; then
-  echo "" >&2
-  echo "  Sentinel: [$DISPLAY_TASK] — Approve? [Y/n] (or click mascot): " >&2
-  read -t 28 -r TERMINAL_INPUT </dev/tty 2>/dev/null || true
-fi
-
-if [ -n "$TERMINAL_INPUT" ]; then
-  kill $CURL_PID 2>/dev/null
-  wait $CURL_PID 2>/dev/null
-  if [[ "$TERMINAL_INPUT" =~ ^[Nn] ]]; then
-    curl -s -X POST http://localhost:49152/action \
-      -H 'Content-Type: application/json' \
-      -d '{"id":"claude","action":"deny"}' > /dev/null
-    echo '{"decision":"deny","reason":"Denied from terminal."}'
-  else
-    curl -s -X POST http://localhost:49152/action \
-      -H 'Content-Type: application/json' \
-      -d '{"id":"claude","action":"approve"}' > /dev/null
-    echo '{"decision":"allow"}'
-  fi
-else
-  wait $CURL_PID
-  RESULT=$(cat /tmp/sentinel-approval-claude 2>/dev/null)
-  rm -f /tmp/sentinel-approval-claude
-  MASCOT_ACTION=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('action','timeout'))" 2>/dev/null || echo "timeout")
-
-  if [ "$MASCOT_ACTION" = "approve" ]; then
-    echo '{"decision":"allow"}'
-  elif [ "$MASCOT_ACTION" = "deny" ]; then
-    echo '{"decision":"deny","reason":"Denied from Sentinel."}'
-  else
-    echo '{"decision":"allow"}'
-  fi
-fi
+echo '{"decision":"allow"}'
