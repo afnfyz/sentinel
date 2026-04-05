@@ -5,7 +5,7 @@
   <title>Sentinel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -15,373 +15,395 @@
       overflow: hidden;
       font-family: 'Space Grotesk', system-ui, sans-serif;
       -webkit-font-smoothing: antialiased;
-      /* Dragging is handled by Swift's isMovableByWindowBackground.
-         No -webkit-app-region needed. Mouse events that pass through
-         to the window background trigger native macOS window drag. */
     }
 
     body {
       display: flex;
       align-items: flex-end;
       justify-content: flex-start;
-      padding: 16px;
-      gap: 12px;
+      padding: 12px;
+      gap: 10px;
     }
 
-    /* ── Each mascot slot — pointer-events:none so the window background
-         receives mouse events for native drag (isMovableByWindowBackground) ── */
+    /* ════════════════════════════════════════
+       MASCOT SLOT — the whole card per agent
+    ════════════════════════════════════════ */
     .mascot-slot {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
-      position: relative;
+      gap: 0;
       opacity: 1;
-      transition: opacity 500ms ease-out;
+      transition: opacity 600ms ease-out;
       pointer-events: none;
     }
-    .mascot-slot.hidden {
-      opacity: 0;
-      pointer-events: none;
+    .mascot-slot.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── Glassmorphism HUD card ── */
+    .hud-card {
+      position: relative;
+      width: 110px;
+      background: rgba(13,17,23,0.82);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 12px 10px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      transition: border-color 400ms ease-out, box-shadow 400ms ease-out;
     }
 
-    /* ── The mascot figure — pointer-events:none so mouse events
-         pass through to the window background for native dragging.
-         Tap detection uses document-level mousedown/mouseup timing. ── */
+    /* Status glow on card — replaces the ring */
+    .s-idle     .hud-card { border-color: rgba(47,158,143,0.2); box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+    .s-thinking .hud-card { border-color: rgba(138,43,226,0.4); box-shadow: 0 4px 24px rgba(138,43,226,0.15); }
+    .s-working  .hud-card { border-color: rgba(47,158,143,0.5); box-shadow: 0 4px 24px rgba(47,158,143,0.2), 0 0 40px rgba(47,158,143,0.08); }
+    .s-approval .hud-card { border-color: rgba(215,25,33,0.7);  box-shadow: 0 4px 24px rgba(215,25,33,0.3),  0 0 48px rgba(215,25,33,0.12); }
+    .s-success  .hud-card { border-color: rgba(47,158,143,0.8); box-shadow: 0 4px 32px rgba(47,158,143,0.35), 0 0 56px rgba(47,158,143,0.15); }
+    .s-error    .hud-card,
+    .s-warning  .hud-card { border-color: rgba(212,168,67,0.5); box-shadow: 0 4px 24px rgba(212,168,67,0.2); }
+
+    /* ── Agent name ── */
+    .agent-name {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      text-align: center;
+      width: 100%;
+    }
+
+    /* ── Pigeon wrapper — glow aura instead of ring ── */
     .mascot-figure {
       position: relative;
-      width: 72px;
-      height: 72px;
+      width: 80px;
+      height: 80px;
       display: flex;
       align-items: center;
       justify-content: center;
       pointer-events: none;
-      cursor: grab;
     }
 
-    /* ── SVG mascot body — pointer-events: none so drags pass through
-         to the window background (macOS handles the drag natively) ── */
+    /* Glow aura behind the pigeon */
+    .mascot-aura {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity 400ms ease-out, background 400ms ease-out;
+      pointer-events: none;
+      filter: blur(12px);
+    }
+    .s-thinking .mascot-aura { background: radial-gradient(circle, rgba(138,43,226,0.35) 0%, transparent 70%); opacity: 1; }
+    .s-working  .mascot-aura { background: radial-gradient(circle, rgba(47,158,143,0.4)  0%, transparent 70%); opacity: 1; }
+    .s-approval .mascot-aura { background: radial-gradient(circle, rgba(215,25,33,0.5)   0%, transparent 70%); opacity: 1; animation: aura-pulse 0.6s ease-in-out infinite; }
+    .s-success  .mascot-aura { background: radial-gradient(circle, rgba(47,158,143,0.5)  0%, transparent 70%); opacity: 1; }
+
+    @keyframes aura-pulse {
+      0%,100% { transform: scale(1);    opacity: 1; }
+      50%      { transform: scale(1.15); opacity: 0.7; }
+    }
+
     .mascot-svg {
-      width: 72px;
-      height: 72px;
+      width: 80px;
+      height: 80px;
       overflow: visible;
       pointer-events: none;
+      position: relative;
+      z-index: 1;
     }
 
-    /* ── IDLE: pigeon head-bob walk cycle ── */
-    .mascot-slot.s-idle .mascot-body-group {
-      animation: pigeon-walk 1.1s steps(1) infinite;
-    }
-    @keyframes pigeon-walk {
-      /* Head juts forward as body rises, snaps back — classic pigeon strut */
+    /* ════════════════════════════════════════
+       PIGEON ANIMATIONS
+    ════════════════════════════════════════ */
+    .mascot-slot.s-idle     .mascot-body-group { animation: pigeon-walk  1.1s steps(1)       infinite; }
+    .mascot-slot.s-thinking .mascot-body-group { animation: pigeon-think 2.4s ease-in-out     infinite; }
+    .mascot-slot.s-working  .mascot-body-group { animation: pigeon-peck  0.45s ease-in-out    infinite; }
+    .mascot-slot.s-approval .mascot-body-group { animation: pigeon-alert 0.7s ease-in-out     infinite; }
+    .mascot-slot.s-success  .mascot-body-group { animation: pigeon-flap  0.5s ease-out        3;        }
+    .mascot-slot.s-error    .mascot-body-group,
+    .mascot-slot.s-warning  .mascot-body-group { animation: pigeon-sad   3s   ease-in-out     infinite; }
+
+    @keyframes pigeon-walk  {
       0%   { transform: translateX(0px)  translateY(0px); }
       25%  { transform: translateX(3px)  translateY(-2px); }
       50%  { transform: translateX(0px)  translateY(0px); }
       75%  { transform: translateX(-1px) translateY(-1px); }
-      100% { transform: translateX(0px)  translateY(0px); }
-    }
-
-    /* ── THINKING: slow deliberate head tilt side to side ── */
-    .mascot-slot.s-thinking .mascot-body-group {
-      animation: pigeon-think 2.4s ease-in-out infinite;
     }
     @keyframes pigeon-think {
-      /* Pigeon tilts head left, pauses, tilts right — classic "considering" */
-      0%   { transform: rotate(0deg)   translateY(0px); }
-      20%  { transform: rotate(-12deg) translateY(-1px); }
-      40%  { transform: rotate(-12deg) translateY(-1px); }
-      60%  { transform: rotate(8deg)   translateY(-1px); }
-      80%  { transform: rotate(8deg)   translateY(-1px); }
-      100% { transform: rotate(0deg)   translateY(0px); }
-    }
-
-    /* ── WORKING: fast rhythmic pecking ── */
-    .mascot-slot.s-working .mascot-body-group {
-      animation: pigeon-peck 0.45s ease-in-out infinite;
+      0%,100% { transform: rotate(0deg)   translateY(0px); }
+      20%,40% { transform: rotate(-12deg) translateY(-1px); }
+      60%,80% { transform: rotate(8deg)   translateY(-1px); }
     }
     @keyframes pigeon-peck {
-      /* Quick forward lunge and snap back — active pecking */
-      0%   { transform: translateX(0px)  translateY(0px)  rotate(0deg); }
-      30%  { transform: translateX(5px)  translateY(4px)  rotate(8deg); }
-      50%  { transform: translateX(5px)  translateY(4px)  rotate(8deg); }
-      80%  { transform: translateX(0px)  translateY(0px)  rotate(0deg); }
-      100% { transform: translateX(0px)  translateY(0px)  rotate(0deg); }
-    }
-
-    /* ── APPROVAL NEEDED: puffed up alert — body swells, quick head dart ── */
-    .mascot-slot.s-approval .mascot-body-group {
-      animation: pigeon-alert 0.7s ease-in-out infinite;
+      0%,100% { transform: translateX(0px) translateY(0px)  rotate(0deg); }
+      30%,50% { transform: translateX(5px) translateY(4px)  rotate(8deg); }
     }
     @keyframes pigeon-alert {
-      /* Alert pigeon: puffs body, raises head sharply, repeats */
-      0%   { transform: scaleX(1)    scaleY(1)    translateY(0px); }
-      20%  { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
-      35%  { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
-      55%  { transform: scaleX(0.96) scaleY(0.97) translateY(1px); }
-      70%  { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
-      100% { transform: scaleX(1)    scaleY(1)    translateY(0px); }
-    }
-
-    /* ── SUCCESS: wing flap — body lifts, spreads wide, settles ── */
-    .mascot-slot.s-success .mascot-body-group {
-      animation: pigeon-flap 0.5s ease-out 3;
+      0%,100% { transform: scaleX(1)    scaleY(1)    translateY(0px); }
+      20%,35% { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
+      55%     { transform: scaleX(0.96) scaleY(0.97) translateY(1px); }
+      70%     { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
     }
     @keyframes pigeon-flap {
       0%   { transform: translateY(0px)   scaleX(1)    scaleY(1); }
       25%  { transform: translateY(-10px) scaleX(1.2)  scaleY(0.85); }
       50%  { transform: translateY(-14px) scaleX(0.88) scaleY(1.1); }
       75%  { transform: translateY(-6px)  scaleX(1.12) scaleY(0.92); }
-      100% { transform: translateY(0px)   scaleX(1)    scaleY(1); }
-    }
-
-    /* ── ERROR / WARNING: hunched, slow sad sway ── */
-    .mascot-slot.s-error .mascot-body-group,
-    .mascot-slot.s-warning .mascot-body-group {
-      animation: pigeon-sad 3s ease-in-out infinite;
     }
     @keyframes pigeon-sad {
-      /* Hunched pigeon barely moving — defeated little sway */
-      0%   { transform: rotate(0deg)  translateY(0px)  scaleY(1); }
-      30%  { transform: rotate(-5deg) translateY(2px)  scaleY(0.95); }
-      60%  { transform: rotate(3deg)  translateY(2px)  scaleY(0.95); }
-      100% { transform: rotate(0deg)  translateY(0px)  scaleY(1); }
+      0%,100% { transform: rotate(0deg)  translateY(0px) scaleY(1); }
+      30%     { transform: rotate(-5deg) translateY(2px) scaleY(0.95); }
+      60%     { transform: rotate(3deg)  translateY(2px) scaleY(0.95); }
     }
 
-    /* ── Status name tag under mascot ── */
-    .mascot-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.55);
-      text-align: center;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
-      white-space: nowrap;
-      padding: 2px 0;
-      user-select: none;
+    /* ════════════════════════════════════════
+       STATUS LINE
+    ════════════════════════════════════════ */
+    .status-line {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
-
-    /* ── Status indicator ring around mascot ── */
-    .mascot-ring {
-      position: absolute;
-      inset: -4px;
+    .status-dot {
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
-      border: 2px solid transparent;
-      transition: border-color 400ms ease-out, box-shadow 400ms ease-out;
-      pointer-events: none;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.2);
+      transition: background 300ms ease-out;
     }
-    .s-thinking .mascot-ring { border-color: rgba(155,127,212,0.5); box-shadow: 0 0 10px rgba(155,127,212,0.3); }
-    .s-working  .mascot-ring { border-color: rgba(212,168,67,0.6);  box-shadow: 0 0 10px rgba(212,168,67,0.3); animation: ring-spin 1s linear infinite; }
-    .s-approval .mascot-ring { border-color: rgba(215,25,33,0.7);   box-shadow: 0 0 14px rgba(215,25,33,0.4); }
-    .s-success  .mascot-ring { border-color: rgba(74,158,92,0.6);   box-shadow: 0 0 12px rgba(74,158,92,0.35); }
+    .s-idle     .status-dot { background: #2F9E8F; }
+    .s-thinking .status-dot { background: #8A2BE2; animation: dot-blink 1.4s ease-in-out infinite; }
+    .s-working  .status-dot { background: #2F9E8F; animation: dot-blink 0.7s ease-in-out infinite; }
+    .s-approval .status-dot { background: #D71921; animation: dot-blink 0.35s ease-in-out infinite; }
+    .s-success  .status-dot { background: #2F9E8F; }
+    .s-error    .status-dot,
+    .s-warning  .status-dot { background: #D4A843; }
 
-    @keyframes ring-spin {
-      from { transform: rotate(0deg); }
-      to   { transform: rotate(360deg); }
+    @keyframes dot-blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    .status-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.4);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      transition: color 300ms ease-out;
+    }
+    .s-idle     .status-text { color: rgba(47,158,143,0.7); }
+    .s-thinking .status-text { color: rgba(138,43,226,0.9); }
+    .s-working  .status-text { color: rgba(47,158,143,0.9); }
+    .s-approval .status-text { color: rgba(215,25,33,0.95); }
+    .s-success  .status-text { color: rgba(47,158,143,1); }
+    .s-error    .status-text,
+    .s-warning  .status-text { color: rgba(212,168,67,0.9); }
+
+    /* ════════════════════════════════════════
+       TASK TEXT (pigeon-flavored)
+    ════════════════════════════════════════ */
+    .task-text {
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.4;
+      text-align: center;
+      width: 100%;
+      min-height: 14px;
+      word-break: break-all;
     }
 
-    /* ── Thought bubble: shows what needs approval ── */
-    .thought-bubble {
+    /* ════════════════════════════════════════
+       SPEECH BUBBLE — approval context
+    ════════════════════════════════════════ */
+    .speech-bubble {
       display: none;
       position: absolute;
-      bottom: calc(100% + 6px);
+      bottom: calc(100% + 10px);
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(10,10,10,0.92);
-      border: 1px solid rgba(215,25,33,0.5);
-      border-radius: 10px;
-      padding: 6px 10px;
-      white-space: nowrap;
-      max-width: 200px;
-      white-space: normal;
-      text-align: center;
+      width: 160px;
+      background: rgba(13,17,23,0.95);
+      border: 1px solid rgba(215,25,33,0.6);
+      border-radius: 12px;
+      padding: 10px 12px;
       pointer-events: none;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 4px 20px rgba(215,25,33,0.25);
     }
-    .thought-bubble::after {
+    /* Arrow pointing down to mascot */
+    .speech-bubble::after {
       content: '';
       position: absolute;
       top: 100%;
       left: 50%;
       transform: translateX(-50%);
-      border: 5px solid transparent;
-      border-top-color: rgba(215,25,33,0.5);
+      border: 6px solid transparent;
+      border-top-color: rgba(215,25,33,0.6);
     }
-    .thought-bubble-text {
-      font-family: 'Space Grotesk', sans-serif;
-      font-size: 11px;
-      color: rgba(255,255,255,0.85);
-      line-height: 1.3;
-    }
-    .thought-bubble-label {
+    .speech-bubble-label {
       font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.1em;
+      font-size: 7px;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
-      color: rgba(215,25,33,0.8);
-      margin-bottom: 2px;
+      color: #D71921;
+      margin-bottom: 4px;
     }
-    .s-approval .thought-bubble { display: block; }
+    .speech-bubble-cmd {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .s-approval .speech-bubble { display: block; }
 
-    /* ── Approval buttons ── */
+    /* ════════════════════════════════════════
+       APPROVAL BUTTONS
+    ════════════════════════════════════════ */
     .approval-btns {
       display: none;
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
       gap: 5px;
-      white-space: nowrap;
-    }
-    /* When approval: show thought bubble above, buttons at bottom */
-    .s-approval .thought-bubble {
-      bottom: auto;
-      top: calc(100% + 6px);
-    }
-    .s-approval .thought-bubble::after {
-      top: auto;
-      bottom: 100%;
-      border-top-color: transparent;
-      border-bottom-color: rgba(215,25,33,0.5);
+      width: 100%;
     }
     .s-approval .approval-btns { display: flex; pointer-events: auto; }
-    .abtn { pointer-events: auto; }
 
     .abtn {
+      flex: 1;
       font-family: 'Space Mono', monospace;
-      font-size: 9px;
+      font-size: 8px;
       font-weight: 700;
-      letter-spacing: 0.07em;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      padding: 5px 10px;
-      border-radius: 999px;
+      padding: 6px 4px;
+      border-radius: 8px;
       cursor: pointer;
-      transition: opacity 150ms;
+      transition: opacity 150ms, transform 80ms;
+      pointer-events: auto;
       backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
     }
-    .abtn:hover  { opacity: 0.75; }
-    .abtn:active { opacity: 0.5; }
+    .abtn:hover  { opacity: 0.8; }
+    .abtn:active { opacity: 0.55; transform: scale(0.97); }
     .abtn-approve {
-      background: rgba(74,158,92,0.2);
-      border: 1px solid rgba(74,158,92,0.8);
-      color: #6FCF87;
+      background: rgba(47,158,143,0.15);
+      border: 1px solid rgba(47,158,143,0.7);
+      color: #2F9E8F;
     }
     .abtn-deny {
-      background: rgba(215,25,33,0.2);
-      border: 1px solid rgba(215,25,33,0.8);
-      color: #FF6B6B;
+      background: rgba(215,25,33,0.15);
+      border: 1px solid rgba(215,25,33,0.7);
+      color: #D71921;
     }
 
-    /* ── Log popover — fixed positioned via JS so it never clips ── */
+    /* ════════════════════════════════════════
+       LOG POPOVER
+    ════════════════════════════════════════ */
     #log-popover {
       position: fixed;
-      width: 260px;
-      background: rgba(10,10,10,0.94);
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 14px;
+      width: 280px;
+      background: rgba(13,17,23,0.96);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
       overflow: hidden;
       opacity: 0;
       pointer-events: none;
       transition: opacity 200ms ease-out, transform 200ms ease-out;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 8px 40px rgba(0,0,0,0.7);
-      transform: scale(0.95);
-      transform-origin: bottom left;
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(47,158,143,0.1);
+      transform: scale(0.95) translateY(4px);
       z-index: 9999;
     }
     #log-popover.open {
       opacity: 1;
       pointer-events: auto;
-      transform: scale(1);
+      transform: scale(1) translateY(0);
     }
-
     .popover-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 10px 14px;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
     }
     .popover-title {
       font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 0.14em;
+      font-size: 8px;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.35);
+      color: #2F9E8F;
     }
     .popover-task {
-      font-size: 11px;
-      color: rgba(255,255,255,0.75);
-      font-style: normal;
-      max-width: 140px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.5);
+      max-width: 150px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-
     .log-feed {
-      max-height: 200px;
+      max-height: 220px;
       overflow-y: auto;
-      padding: 6px 0;
     }
     .log-feed::-webkit-scrollbar { width: 2px; }
-    .log-feed::-webkit-scrollbar-track { background: transparent; }
-    .log-feed::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 1px; }
-
+    .log-feed::-webkit-scrollbar-thumb { background: rgba(47,158,143,0.3); border-radius: 1px; }
     .log-row {
       display: flex;
       align-items: baseline;
-      gap: 7px;
-      padding: 5px 14px;
+      gap: 8px;
+      padding: 6px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
     }
-    .log-row + .log-row { border-top: 1px solid rgba(255,255,255,0.04); }
-
+    .log-row:last-child { border-bottom: none; }
     .log-dot {
-      width: 4px;
-      height: 4px;
+      width: 4px; height: 4px;
       border-radius: 50%;
       flex-shrink: 0;
       margin-top: 4px;
-      background: rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.15);
     }
-    .log-row.ls-success        .log-dot { background: #4A9E5C; }
-    .log-row.ls-working        .log-dot { background: #D4A843; }
-    .log-row.ls-thinking       .log-dot { background: #9B7FD4; }
+    .log-row.ls-success        .log-dot { background: #2F9E8F; }
+    .log-row.ls-working        .log-dot { background: #2F9E8F; }
+    .log-row.ls-thinking       .log-dot { background: #8A2BE2; }
     .log-row.ls-needs_approval .log-dot { background: #D71921; }
     .log-row.ls-error          .log-dot,
-    .log-row.ls-warning        .log-dot { background: #D71921; }
-
+    .log-row.ls-warning        .log-dot { background: #D4A843; }
     .log-text {
       flex: 1;
       font-size: 11px;
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.45);
       line-height: 1.4;
     }
-    .log-text strong { color: rgba(255,255,255,0.85); font-weight: 500; }
-
+    .log-text strong { color: rgba(255,255,255,0.8); font-weight: 500; }
     .log-time {
       font-family: 'Space Mono', monospace;
       font-size: 8px;
-      color: rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.18);
       flex-shrink: 0;
     }
-
     .log-empty {
-      padding: 16px 14px;
+      padding: 20px 14px;
       font-family: 'Space Mono', monospace;
       font-size: 9px;
-      letter-spacing: 0.08em;
-      color: rgba(255,255,255,0.2);
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.18);
       text-transform: uppercase;
+      text-align: center;
     }
   </style>
 </head>
 <body>
   <div id="mascots-area"></div>
-
-  <!-- Single shared log popover, positioned by JS -->
   <div id="log-popover">
     <div class="popover-header">
       <span class="popover-title"></span>
@@ -391,107 +413,91 @@
   </div>
 
   <script>
-    const IDLE_TIMEOUT = 120000; // 2 min
+    const IDLE_TIMEOUT = 120000;
 
-    let sessions    = {};
-    let history     = [];
-    let hideTimers  = {};
-    let openLog     = null; // id of agent whose log is open
-    let eventSource = null;
+    let sessions = {}, history = [], hideTimers = {}, openLog = null, eventSource = null;
 
-    // ── Pixel-art pigeon SVG (same bird for all agents) ──────────────────
-    function buildMascotSVG(id, name) {
-      // Unique animation id suffix per instance to avoid CSS collision
-      const uid = (id || 'x').replace(/[^a-z0-9]/gi, '');
-      return `
-<svg class="mascot-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-  <g class="mascot-body-group" style="transform-origin:32px 56px">
+    // ── Pigeon-flavored status labels ─────────────────────────────────────
+    const STATUS_LABELS = {
+      idle:           'Roosting...',
+      thinking:       'Scouting...',
+      working:        'Pecking...',
+      needs_approval: 'Alert!',
+      success:        'Delivered!',
+      error:          'Ruffled',
+      warning:        'Wary',
+    };
 
+    // ── Pixel-art pigeon SVG ──────────────────────────────────────────────
+    function buildPigeonSVG() {
+      return `<svg class="mascot-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+  <g class="mascot-body-group" style="transform-origin:32px 52px">
     <!-- Shadow -->
-    <ellipse cx="34" cy="61" rx="14" ry="3" fill="rgba(0,0,0,0.18)"/>
-
-    <!-- ── FEET & CLAWS ── -->
-    <!-- Left leg -->
+    <ellipse cx="34" cy="61" rx="14" ry="2.5" fill="rgba(0,0,0,0.2)"/>
+    <!-- Feet -->
     <rect x="26" y="52" width="2" height="5" fill="#E8AAB8"/>
     <rect x="24" y="57" width="6" height="2" fill="#E8AAB8"/>
-    <rect x="23" y="59" width="2" height="1" fill="#1a1a1a"/>
-    <rect x="27" y="59" width="2" height="1" fill="#1a1a1a"/>
-    <rect x="29" y="59" width="1" height="1" fill="#1a1a1a"/>
-    <!-- Right leg -->
+    <rect x="23" y="59" width="2" height="1" fill="#111"/>
+    <rect x="27" y="59" width="2" height="1" fill="#111"/>
+    <rect x="29" y="59" width="1" height="1" fill="#111"/>
     <rect x="34" y="52" width="2" height="5" fill="#E8AAB8"/>
     <rect x="32" y="57" width="6" height="2" fill="#E8AAB8"/>
-    <rect x="31" y="59" width="2" height="1" fill="#1a1a1a"/>
-    <rect x="35" y="59" width="2" height="1" fill="#1a1a1a"/>
-    <rect x="37" y="59" width="1" height="1" fill="#1a1a1a"/>
-
-    <!-- ── TAIL ── -->
+    <rect x="31" y="59" width="2" height="1" fill="#111"/>
+    <rect x="35" y="59" width="2" height="1" fill="#111"/>
+    <rect x="37" y="59" width="1" height="1" fill="#111"/>
+    <!-- Tail -->
     <rect x="10" y="42" width="4"  height="3"  fill="#404C5F"/>
     <rect x="11" y="40" width="4"  height="3"  fill="#404C5F"/>
     <rect x="12" y="38" width="3"  height="3"  fill="#4A5568"/>
     <rect x="13" y="36" width="2"  height="3"  fill="#4A5568"/>
-    <!-- tail feather highlights -->
     <rect x="11" y="43" width="1"  height="1"  fill="#64748B"/>
     <rect x="13" y="41" width="1"  height="1"  fill="#64748B"/>
-
-    <!-- ── LOWER BODY ── -->
+    <!-- Lower body -->
     <rect x="16" y="40" width="28" height="12" fill="#64748B"/>
     <rect x="14" y="38" width="30" height="4"  fill="#64748B"/>
     <rect x="16" y="52" width="24" height="2"  fill="#4A5568"/>
-
-    <!-- ── UPPER BODY / WING ── -->
+    <!-- Upper body / wing -->
     <rect x="16" y="24" width="30" height="18" fill="#C0C9D9"/>
-    <!-- dapple markings -->
     <rect x="20" y="27" width="4"  height="2"  fill="#9EAAC0"/>
     <rect x="27" y="26" width="5"  height="2"  fill="#9EAAC0"/>
     <rect x="34" y="28" width="4"  height="2"  fill="#9EAAC0"/>
     <rect x="22" y="31" width="5"  height="2"  fill="#9EAAC0"/>
     <rect x="30" y="32" width="4"  height="2"  fill="#9EAAC0"/>
     <rect x="38" y="30" width="3"  height="2"  fill="#9EAAC0"/>
-    <!-- wing bars -->
+    <!-- Wing bars -->
     <rect x="16" y="34" width="30" height="2"  fill="#364150"/>
     <rect x="16" y="38" width="28" height="2"  fill="#364150"/>
-
-    <!-- ── IRIDESCENT NECK ── -->
-    <!-- teal band -->
+    <!-- Iridescent neck — teal -->
     <rect x="24" y="18" width="14" height="4"  fill="#2F9E8F"/>
     <rect x="22" y="20" width="16" height="3"  fill="#2F9E8F"/>
-    <!-- purple-violet overlay -->
+    <!-- Iridescent neck — purple -->
     <rect x="26" y="17" width="8"  height="3"  fill="#5E4070"/>
     <rect x="24" y="19" width="4"  height="2"  fill="#5E4070"/>
     <rect x="32" y="19" width="4"  height="2"  fill="#5E4070"/>
-    <!-- neck base -->
+    <!-- Neck base -->
     <rect x="22" y="22" width="16" height="4"  fill="#4A5D7A"/>
-
-    <!-- ── HEAD ── -->
+    <!-- Head -->
     <rect x="26" y="8"  width="16" height="4"  fill="#4A5D7A"/>
     <rect x="24" y="10" width="18" height="4"  fill="#4A5D7A"/>
     <rect x="24" y="12" width="18" height="6"  fill="#4A5D7A"/>
     <rect x="26" y="16" width="16" height="2"  fill="#4A5D7A"/>
-    <!-- head highlight -->
     <rect x="30" y="9"  width="6"  height="2"  fill="#5B6E8A"/>
-
-    <!-- ── EYE ── -->
-    <rect x="36" y="12" width="5"  height="5"  fill="#1a1a1a"/>
+    <!-- Eye -->
+    <rect x="36" y="12" width="5"  height="5"  fill="#111"/>
     <rect x="37" y="13" width="3"  height="3"  fill="#EEA14F"/>
     <rect x="38" y="13" width="2"  height="2"  fill="#F4B95F"/>
-    <!-- pupil -->
     <rect x="38" y="14" width="2"  height="2"  fill="#0a0a0a"/>
-    <!-- shine -->
-    <rect x="38" y="13" width="1"  height="1"  fill="rgba(255,255,255,0.9)"/>
-
-    <!-- ── BEAK ── -->
+    <rect x="38" y="13" width="1"  height="1"  fill="rgba(255,255,255,0.95)"/>
+    <!-- Beak -->
     <rect x="42" y="13" width="6"  height="2"  fill="#AEB8C6"/>
     <rect x="44" y="15" width="4"  height="2"  fill="#AEB8C6"/>
-    <!-- beak tip hook -->
     <rect x="47" y="14" width="2"  height="2"  fill="#8E98A6"/>
-    <!-- nostril -->
     <rect x="43" y="13" width="2"  height="1"  fill="#8E98A6"/>
-
   </g>
 </svg>`;
     }
 
-    // ── Build / update mascot slot ────────────────────────────────────────
+    // ── Slot creation ─────────────────────────────────────────────────────
     function getOrCreateSlot(s) {
       const area = document.getElementById('mascots-area');
       let slot = area.querySelector(`[data-id="${s.id}"]`);
@@ -500,56 +506,55 @@
         slot.className = 'mascot-slot';
         slot.dataset.id = s.id;
         slot.innerHTML = `
-          <div class="mascot-figure">
-            <div class="mascot-ring"></div>
-            ${buildMascotSVG(s.id, s.name)}
-            <div class="thought-bubble">
-              <div class="thought-bubble-label">Allow?</div>
-              <div class="thought-bubble-text"></div>
+          <div class="hud-card">
+            <div class="agent-name">${(s.name || s.id).toUpperCase()}</div>
+            <div class="mascot-figure">
+              <div class="mascot-aura"></div>
+              ${buildPigeonSVG()}
+              <div class="speech-bubble">
+                <div class="speech-bubble-label">⚠ Permission needed</div>
+                <div class="speech-bubble-cmd"></div>
+              </div>
             </div>
+            <div class="status-line">
+              <div class="status-dot"></div>
+              <div class="status-text"></div>
+            </div>
+            <div class="task-text"></div>
             <div class="approval-btns">
-              <button class="abtn abtn-approve">✓ Yes</button>
-              <button class="abtn abtn-deny">✕ No</button>
+              <button class="abtn abtn-approve">✓ Allow</button>
+              <button class="abtn abtn-deny">✕ Deny</button>
             </div>
           </div>
-          <div class="mascot-label">${(s.name || s.id).toUpperCase()}</div>
         `;
-        // Approval buttons — these have pointer-events:auto
-        slot.querySelector('.abtn-approve').onclick = (e) => { e.stopPropagation(); doAction(s.id, 'approve'); };
-        slot.querySelector('.abtn-deny').onclick    = (e) => { e.stopPropagation(); doAction(s.id, 'deny'); };
+        slot.querySelector('.abtn-approve').onclick = e => { e.stopPropagation(); doAction(s.id, 'approve'); };
+        slot.querySelector('.abtn-deny').onclick    = e => { e.stopPropagation(); doAction(s.id, 'deny'); };
         area.appendChild(slot);
       }
       return slot;
     }
 
     function updateSlot(slot, s) {
-      // Status classes
       const sc = statusClass(s.status);
       const wasHidden = slot.classList.contains('hidden');
       slot.className = `mascot-slot ${sc}${wasHidden ? ' hidden' : ''}`;
 
-      // Name label
-      slot.querySelector('.mascot-label').textContent = (s.name || s.id).toUpperCase();
+      slot.querySelector('.agent-name').textContent   = (s.name || s.id).toUpperCase();
+      slot.querySelector('.status-text').textContent  = STATUS_LABELS[s.status] || s.status;
+      slot.querySelector('.task-text').textContent    = (s.status !== 'idle' && s.status !== 'needs_approval') ? (s.task || '') : '';
+      slot.querySelector('.speech-bubble-cmd').textContent = s.task || '';
 
-      // Thought bubble — show task context during approval
-      const bubble = slot.querySelector('.thought-bubble-text');
-      if (bubble) bubble.textContent = s.task || '';
-
-      // Update shared popover header if it's open for this slot
       if (openLog === s.id) {
         document.querySelector('#log-popover .popover-title').textContent = (s.name || s.id).toUpperCase();
-        document.querySelector('#log-popover .popover-task').textContent  = (s.status !== 'idle' && s.task) ? s.task : '';
+        document.querySelector('#log-popover .popover-task').textContent  = s.task || '';
+        renderLogFeed();
       }
 
-      // Auto-hide logic
       if (s.status === 'idle') {
         scheduleHide(s.id, s.timestamp || Date.now());
       } else {
         showSlot(s.id);
       }
-
-      // If log is open, refresh its feed
-      if (openLog === s.id) renderLogFeed();
     }
 
     function statusClass(st) {
@@ -558,47 +563,33 @@
                error:'s-error', warning:'s-warning' }[st] || 's-idle';
     }
 
-    // ── Log popover (single shared, fixed-positioned) ─────────────────────
+    // ── Log popover ───────────────────────────────────────────────────────
     function toggleLog(id, slot) {
-      if (openLog === id) {
-        closeLog();
-        return;
-      }
+      if (openLog === id) { closeLog(); return; }
       if (openLog) closeLog();
       openLog = id;
 
       const popover = document.getElementById('log-popover');
-      // Position above the mascot figure
-      const fig = slot.querySelector('.mascot-figure');
-      const rect = fig.getBoundingClientRect();
-      const pw = 260;
-      const margin = 10;
+      const card    = slot.querySelector('.hud-card');
+      const rect    = card.getBoundingClientRect();
+      const pw = 280, margin = 10;
 
-      // Horizontal: center on mascot, clamp to viewport
       let left = rect.left + rect.width / 2 - pw / 2;
       left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
 
-      // Vertical: above the mascot
-      let bottom = window.innerHeight - rect.top + 8;
-
-      popover.style.left   = left + 'px';
-      popover.style.bottom = bottom + 'px';
-      popover.style.top    = 'auto';
-      popover.style.transformOrigin = 'bottom center';
-
-      // If popover would go above viewport, flip below
-      const popoverHeight = 280;
-      if (rect.top - popoverHeight - 8 < 0) {
-        popover.style.bottom = 'auto';
+      const aboveRoom = rect.top - 10;
+      if (aboveRoom > 240) {
+        popover.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+        popover.style.top    = 'auto';
+      } else {
         popover.style.top    = (rect.bottom + 8) + 'px';
-        popover.style.transformOrigin = 'top center';
+        popover.style.bottom = 'auto';
       }
+      popover.style.left = left + 'px';
 
-      // Update header
       const s = sessions[id] || {};
       popover.querySelector('.popover-title').textContent = (s.name || id).toUpperCase();
-      popover.querySelector('.popover-task').textContent  = (s.status !== 'idle' && s.task) ? s.task : '';
-
+      popover.querySelector('.popover-task').textContent  = s.task || '';
       renderLogFeed();
       popover.classList.add('open');
     }
@@ -612,7 +603,7 @@
       const feed = document.getElementById('log-feed');
       const entries = history.slice(-40).reverse();
       if (!entries.length) {
-        feed.innerHTML = '<div class="log-empty">No activity yet</div>';
+        feed.innerHTML = '<div class="log-empty">No pecks yet</div>';
         return;
       }
       feed.innerHTML = '';
@@ -632,39 +623,26 @@
     function scheduleHide(id, timestamp) {
       if (hideTimers[id]) clearTimeout(hideTimers[id]);
       const remaining = IDLE_TIMEOUT - (Date.now() - timestamp);
-      if (remaining <= 0) {
-        hideSlot(id);
-      } else {
-        hideTimers[id] = setTimeout(() => hideSlot(id), remaining);
-      }
+      if (remaining <= 0) { hideSlot(id); return; }
+      hideTimers[id] = setTimeout(() => hideSlot(id), remaining);
     }
-
     function hideSlot(id) {
       const slot = document.querySelector(`[data-id="${id}"]`);
       if (slot) slot.classList.add('hidden');
       if (openLog === id) closeLog();
     }
-
     function showSlot(id) {
       if (hideTimers[id]) clearTimeout(hideTimers[id]);
       const slot = document.querySelector(`[data-id="${id}"]`);
       if (slot) slot.classList.remove('hidden');
     }
 
-    // ── Render all sessions ───────────────────────────────────────────────
+    // ── Render sessions ───────────────────────────────────────────────────
     function renderSessions(newSessions) {
       const area = document.getElementById('mascots-area');
       const ids  = new Set(Object.keys(newSessions));
-
-      // Remove gone sessions
-      area.querySelectorAll('[data-id]').forEach(el => {
-        if (!ids.has(el.dataset.id)) el.remove();
-      });
-
-      Object.values(newSessions).forEach(s => {
-        const slot = getOrCreateSlot(s);
-        updateSlot(slot, s);
-      });
+      area.querySelectorAll('[data-id]').forEach(el => { if (!ids.has(el.dataset.id)) el.remove(); });
+      Object.values(newSessions).forEach(s => updateSlot(getOrCreateSlot(s), s));
     }
 
     // ── SSE ───────────────────────────────────────────────────────────────
@@ -679,10 +657,7 @@
           renderSessions(sessions);
         } catch(_) {}
       });
-      eventSource.onerror = () => {
-        eventSource.close();
-        setTimeout(connectSSE, 5000);
-      };
+      eventSource.onerror = () => { eventSource.close(); setTimeout(connectSSE, 5000); };
     }
 
     async function doAction(id, type) {
@@ -693,42 +668,24 @@
       });
     }
 
-    // ── Tap detection ───────────────────────────────────────────────────
-    // Everything except buttons is pointer-events:none, so mouse events
-    // always reach the document. We detect taps (short press, small move)
-    // and check if coordinates overlap a mascot figure.
+    // ── Tap detection (everything is pointer-events:none except buttons) ──
     let _tapX = 0, _tapY = 0, _tapTime = 0;
-    document.addEventListener('mousedown', e => {
-      _tapX = e.clientX; _tapY = e.clientY; _tapTime = Date.now();
-    });
+    document.addEventListener('mousedown', e => { _tapX = e.clientX; _tapY = e.clientY; _tapTime = Date.now(); });
     document.addEventListener('mouseup', e => {
-      const dt = Date.now() - _tapTime;
-      const dist = Math.hypot(e.clientX - _tapX, e.clientY - _tapY);
-      if (dt > 400 || dist > 10) return; // was a drag or long-press
+      if (Date.now() - _tapTime > 400 || Math.hypot(e.clientX - _tapX, e.clientY - _tapY) > 10) return;
 
-      // Check if tap landed inside the log popover
       const popover = document.getElementById('log-popover');
       if (popover.classList.contains('open')) {
-        const pr = popover.getBoundingClientRect();
-        if (e.clientX >= pr.left && e.clientX <= pr.right &&
-            e.clientY >= pr.top  && e.clientY <= pr.bottom) {
-          return; // tapped inside popover, don't close it
-        }
+        const r = popover.getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
       }
 
-      // Check if tap landed on a mascot figure
-      const slots = document.querySelectorAll('.mascot-slot:not(.hidden)');
-      for (const slot of slots) {
-        const fig = slot.querySelector('.mascot-figure');
-        const r = fig.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right &&
-            e.clientY >= r.top  && e.clientY <= r.bottom) {
-          toggleLog(slot.dataset.id, slot);
-          return;
+      for (const slot of document.querySelectorAll('.mascot-slot:not(.hidden)')) {
+        const r = slot.querySelector('.hud-card').getBoundingClientRect();
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+          toggleLog(slot.dataset.id, slot); return;
         }
       }
-
-      // Tapped outside everything → close log
       if (openLog) closeLog();
     });
 
