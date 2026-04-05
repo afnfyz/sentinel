@@ -396,65 +396,93 @@
     let openLog     = null; // id of agent whose log is open
     let eventSource = null;
 
-    // ── SVG mascot per agent ──────────────────────────────────────────────
+    // ── Pixel-art pigeon SVG (same bird for all agents) ──────────────────
     function buildMascotSVG(id, name) {
-      const n = (name || id || '').toUpperCase();
-      // Color per agent
-      let bodyColor, eyeColor, blushColor;
-      if (n.startsWith('GEMINI') || n === 'MAIN') {
-        bodyColor  = '#4285F4'; // Google blue
-        eyeColor   = '#FFFFFF';
-        blushColor = '#86AEFA';
-      } else if (n.startsWith('CLAUDE')) {
-        bodyColor  = '#CC785C'; // Claude orange/brown
-        eyeColor   = '#FFFFFF';
-        blushColor = '#E8A88A';
-      } else {
-        bodyColor  = '#888888';
-        eyeColor   = '#FFFFFF';
-        blushColor = '#AAAAAA';
-      }
-
-      // SVG: round blob body, two eyes, rosy cheeks, little feet
+      // Unique animation id suffix per instance to avoid CSS collision
+      const uid = (id || 'x').replace(/[^a-z0-9]/gi, '');
       return `
-<svg class="mascot-svg" viewBox="0 0 56 62" xmlns="http://www.w3.org/2000/svg">
-  <g class="mascot-body-group" style="transform-origin: 28px 48px">
+<svg class="mascot-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+  <g class="mascot-body-group" style="transform-origin:32px 56px">
 
     <!-- Shadow -->
-    <ellipse cx="28" cy="59" rx="12" ry="3.5" fill="rgba(0,0,0,0.25)"/>
+    <ellipse cx="34" cy="61" rx="14" ry="3" fill="rgba(0,0,0,0.18)"/>
 
-    <!-- Feet -->
-    <ellipse cx="20" cy="56" rx="6" ry="3.5" fill="${bodyColor}" opacity="0.8"/>
-    <ellipse cx="36" cy="56" rx="6" ry="3.5" fill="${bodyColor}" opacity="0.8"/>
+    <!-- ── FEET & CLAWS ── -->
+    <!-- Left leg -->
+    <rect x="26" y="52" width="2" height="5" fill="#E8AAB8"/>
+    <rect x="24" y="57" width="6" height="2" fill="#E8AAB8"/>
+    <rect x="23" y="59" width="2" height="1" fill="#1a1a1a"/>
+    <rect x="27" y="59" width="2" height="1" fill="#1a1a1a"/>
+    <rect x="29" y="59" width="1" height="1" fill="#1a1a1a"/>
+    <!-- Right leg -->
+    <rect x="34" y="52" width="2" height="5" fill="#E8AAB8"/>
+    <rect x="32" y="57" width="6" height="2" fill="#E8AAB8"/>
+    <rect x="31" y="59" width="2" height="1" fill="#1a1a1a"/>
+    <rect x="35" y="59" width="2" height="1" fill="#1a1a1a"/>
+    <rect x="37" y="59" width="1" height="1" fill="#1a1a1a"/>
 
-    <!-- Body blob -->
-    <ellipse cx="28" cy="34" rx="18" ry="20" fill="${bodyColor}"/>
+    <!-- ── TAIL ── -->
+    <rect x="10" y="42" width="4"  height="3"  fill="#404C5F"/>
+    <rect x="11" y="40" width="4"  height="3"  fill="#404C5F"/>
+    <rect x="12" y="38" width="3"  height="3"  fill="#4A5568"/>
+    <rect x="13" y="36" width="2"  height="3"  fill="#4A5568"/>
+    <!-- tail feather highlights -->
+    <rect x="11" y="43" width="1"  height="1"  fill="#64748B"/>
+    <rect x="13" y="41" width="1"  height="1"  fill="#64748B"/>
 
-    <!-- Belly highlight -->
-    <ellipse cx="28" cy="37" rx="9" ry="10" fill="rgba(255,255,255,0.12)"/>
+    <!-- ── LOWER BODY ── -->
+    <rect x="16" y="40" width="28" height="12" fill="#64748B"/>
+    <rect x="14" y="38" width="30" height="4"  fill="#64748B"/>
+    <rect x="16" y="52" width="24" height="2"  fill="#4A5568"/>
 
-    <!-- Left eye white -->
-    <ellipse cx="21" cy="28" rx="5.5" ry="6" fill="${eyeColor}"/>
-    <!-- Right eye white -->
-    <ellipse cx="35" cy="28" rx="5.5" ry="6" fill="${eyeColor}"/>
+    <!-- ── UPPER BODY / WING ── -->
+    <rect x="16" y="24" width="30" height="18" fill="#C0C9D9"/>
+    <!-- dapple markings -->
+    <rect x="20" y="27" width="4"  height="2"  fill="#9EAAC0"/>
+    <rect x="27" y="26" width="5"  height="2"  fill="#9EAAC0"/>
+    <rect x="34" y="28" width="4"  height="2"  fill="#9EAAC0"/>
+    <rect x="22" y="31" width="5"  height="2"  fill="#9EAAC0"/>
+    <rect x="30" y="32" width="4"  height="2"  fill="#9EAAC0"/>
+    <rect x="38" y="30" width="3"  height="2"  fill="#9EAAC0"/>
+    <!-- wing bars -->
+    <rect x="16" y="34" width="30" height="2"  fill="#364150"/>
+    <rect x="16" y="38" width="28" height="2"  fill="#364150"/>
 
-    <!-- Left pupil -->
-    <circle class="eye-l" cx="22" cy="29" r="2.8" fill="#1a1a1a"/>
-    <!-- Right pupil -->
-    <circle class="eye-r" cx="36" cy="29" r="2.8" fill="#1a1a1a"/>
+    <!-- ── IRIDESCENT NECK ── -->
+    <!-- teal band -->
+    <rect x="24" y="18" width="14" height="4"  fill="#2F9E8F"/>
+    <rect x="22" y="20" width="16" height="3"  fill="#2F9E8F"/>
+    <!-- purple-violet overlay -->
+    <rect x="26" y="17" width="8"  height="3"  fill="#5E4070"/>
+    <rect x="24" y="19" width="4"  height="2"  fill="#5E4070"/>
+    <rect x="32" y="19" width="4"  height="2"  fill="#5E4070"/>
+    <!-- neck base -->
+    <rect x="22" y="22" width="16" height="4"  fill="#4A5D7A"/>
 
-    <!-- Left eye shine -->
-    <circle cx="23.2" cy="27.5" r="1" fill="rgba(255,255,255,0.9)"/>
-    <!-- Right eye shine -->
-    <circle cx="37.2" cy="27.5" r="1" fill="rgba(255,255,255,0.9)"/>
+    <!-- ── HEAD ── -->
+    <rect x="26" y="8"  width="16" height="4"  fill="#4A5D7A"/>
+    <rect x="24" y="10" width="18" height="4"  fill="#4A5D7A"/>
+    <rect x="24" y="12" width="18" height="6"  fill="#4A5D7A"/>
+    <rect x="26" y="16" width="16" height="2"  fill="#4A5D7A"/>
+    <!-- head highlight -->
+    <rect x="30" y="9"  width="6"  height="2"  fill="#5B6E8A"/>
 
-    <!-- Blush left -->
-    <ellipse cx="16" cy="34" rx="3.5" ry="2" fill="${blushColor}" opacity="0.6"/>
-    <!-- Blush right -->
-    <ellipse cx="40" cy="34" rx="3.5" ry="2" fill="${blushColor}" opacity="0.6"/>
+    <!-- ── EYE ── -->
+    <rect x="36" y="12" width="5"  height="5"  fill="#1a1a1a"/>
+    <rect x="37" y="13" width="3"  height="3"  fill="#EEA14F"/>
+    <rect x="38" y="13" width="2"  height="2"  fill="#F4B95F"/>
+    <!-- pupil -->
+    <rect x="38" y="14" width="2"  height="2"  fill="#0a0a0a"/>
+    <!-- shine -->
+    <rect x="38" y="13" width="1"  height="1"  fill="rgba(255,255,255,0.9)"/>
 
-    <!-- Smile (default) -->
-    <path class="mouth-smile" d="M 23 38 Q 28 43 33 38" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- ── BEAK ── -->
+    <rect x="42" y="13" width="6"  height="2"  fill="#AEB8C6"/>
+    <rect x="44" y="15" width="4"  height="2"  fill="#AEB8C6"/>
+    <!-- beak tip hook -->
+    <rect x="47" y="14" width="2"  height="2"  fill="#8E98A6"/>
+    <!-- nostril -->
+    <rect x="43" y="13" width="2"  height="1"  fill="#8E98A6"/>
 
   </g>
 </svg>`;
