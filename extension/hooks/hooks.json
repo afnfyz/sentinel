@@ -28,7 +28,7 @@
           {
             "type": "command",
             "name": "sentinel-working",
-            "command": "/Users/afnan_dfx/.gemini/hooks/sentinel-before-tool.sh"
+            "command": "$HOME/.gemini/hooks/sentinel-before-tool.sh"
           }
         ]
       }
@@ -39,7 +39,7 @@
           {
             "type": "command",
             "name": "sentinel-session-start",
-            "command": "/Users/afnan_dfx/.gemini/hooks/sentinel-session-start.sh",
+            "command": "$HOME/.gemini/hooks/sentinel-session-start.sh",
             "timeout": 10000
           }
         ]
@@ -51,7 +51,7 @@
           {
             "type": "command",
             "name": "sentinel-session-end",
-            "command": "/Users/afnan_dfx/.gemini/hooks/sentinel-session-end.sh"
+            "command": "$HOME/.gemini/hooks/sentinel-session-end.sh"
           }
         ]
       }
