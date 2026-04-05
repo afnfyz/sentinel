@@ -19,9 +19,11 @@ else:
     print('')
 " 2>/dev/null || echo "")
 
-# Only Write, Edit, NotebookEdit need mascot approval
+# Only Write (new file creation) needs mascot approval.
+# Edit is handled by Claude Code's own "Edit automatically" permission system.
+# NotebookEdit similarly.
 case "$tool_name" in
-  Write|Edit|NotebookEdit)
+  Write)
     DESTRUCTIVE=1
     ;;
   *)
