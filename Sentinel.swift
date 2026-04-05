@@ -4,6 +4,13 @@ import WebKit
 class SentinelWindow: NSWindow {
     override var canBecomeKey: Bool { return true }
     override var canBecomeMain: Bool { return true }
+
+    // WKWebView intercepts mouse events and blocks isMovableByWindowBackground.
+    // Override mouseDown to initiate window drag directly whenever WKWebView
+    // passes an unhandled mouseDown up the responder chain.
+    override func mouseDown(with event: NSEvent) {
+        performDrag(with: event)
+    }
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
