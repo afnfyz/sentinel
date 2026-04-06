@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Sentinel - Pixel Perfect</title>
+  <title>Sentinel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -15,77 +15,15 @@
       overflow: hidden;
     }
 
-    body {
-      display: flex;
-      align-items: flex-end;
-      justify-content: flex-start;
-      padding: 20px;
-      gap: 24px;
-    }
-
+    /* Each mascot slot is positioned absolutely at the bottom of the window */
     .mascot-slot {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      transition: opacity 400ms;
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
     }
 
-    /* APPROVAL BUTTONS — float above the mascot figure */
-    .approval-btns {
-      display: none;
-      gap: 10px;
-      margin-bottom: 10px;
-      position: relative;
-      z-index: 20;
-    }
-    .s-needs_approval .approval-btns { display: flex; }
-
-    .abtn {
-      font-family: 'Bangers', cursive;
-      font-size: 18px;
-      letter-spacing: 0.05em;
-      padding: 8px 20px;
-      border-radius: 50px;
-      border: 3px solid #111;
-      cursor: pointer;
-      /* chunky comic-book drop shadow */
-      box-shadow: 3px 4px 0px #111;
-      transition: transform 80ms, box-shadow 80ms;
-      user-select: none;
-    }
-    .abtn:active {
-      transform: translate(2px, 3px);
-      box-shadow: 1px 1px 0px #111;
-    }
-    .abtn-deny {
-      background: #FF4455;
-      color: #fff;
-    }
-    .abtn-approve {
-      background: #2FDFB0;
-      color: #111;
-    }
-
-    /* THOUGHT BUBBLE — sits between buttons and mascot figure, in normal flow */
-    .thought-bubble {
-      display: none;
-      background: #fff;
-      border: 3px solid #111;
-      border-radius: 20px;
-      padding: 8px 14px;
-      min-width: 130px;
-      max-width: 160px;
-      filter: drop-shadow(3px 4px 0px #111);
-      pointer-events: none;
-      margin-bottom: 8px;
-      text-align: center;
-    }
-    .s-needs_approval .thought-bubble { display: block; }
-    .bubble-text { font-family: 'Bangers', cursive; font-size: 15px; color: #D71921; display: block; }
-    .bubble-task { font-family: 'Space Mono', monospace; font-size: 9px; color: #333; display: block; margin-top: 2px; word-break: break-all; }
-
-    /* FIGURE & SVG */
+    /* ===== PIGEON — always at the same spot ===== */
     .mascot-figure {
       position: relative;
       width: 120px;
@@ -94,6 +32,7 @@
       align-items: flex-end;
       justify-content: center;
       cursor: pointer;
+      z-index: 1;
     }
     .mascot-svg {
       width: 100px;
@@ -101,18 +40,112 @@
       image-rendering: pixelated;
     }
 
-    /* ANIMATION ANCHORS */
-    .p-head-unit { transform-origin: 45px 35px; }
-    .p-body-group { transform-origin: 40px 60px; }
-
     .agent-name {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
       color: rgba(255,255,255,0.4);
-      margin-top: 8px;
+      text-align: center;
+      margin-top: 4px;
       letter-spacing: 0.15em;
       text-transform: uppercase;
     }
+
+    /* ===== THOUGHT BUBBLE — floats above pigeon via absolute pos ===== */
+    .thought-bubble {
+      display: none;
+      position: absolute;
+      bottom: 115px;          /* sits above the pigeon */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 260px;
+      height: 230px;
+      z-index: 5;
+    }
+    .s-needs_approval .thought-bubble { display: block; }
+
+    .cloud-bg {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+
+    .cloud-content {
+      position: absolute;
+      top: 10%; left: 16%; right: 12%;
+      bottom: 20%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      z-index: 2;
+    }
+
+    /* "ALLOW ACCESS?" SVG text */
+    .bubble-title {
+      width: 78%;
+      pointer-events: none;
+    }
+
+    /* parchment text strip */
+    .task-strip {
+      position: relative;
+      width: 94%;
+      min-height: 36px;
+    }
+    .task-strip > img {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+    }
+    .task-strip-text {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 7.5px;
+      color: #333;
+      text-align: center;
+      padding: 8px 12px;
+      line-height: 1.4;
+      overflow: hidden;
+      word-break: break-all;
+      white-space: normal;
+    }
+
+    /* DENY / ALLOW buttons */
+    .approval-btns {
+      display: none;
+      gap: 8px;
+      justify-content: center;
+      align-items: center;
+    }
+    .s-needs_approval .approval-btns { display: flex; }
+
+    .abtn {
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      transition: transform 80ms;
+      user-select: none;
+    }
+    .abtn:active { transform: scale(0.88); }
+    .abtn img {
+      height: 28px;
+      pointer-events: none;
+    }
+
+    /* ===== ANIMATION ANCHORS ===== */
+    .p-head-unit { transform-origin: 45px 35px; }
+    .p-body-group { transform-origin: 40px 60px; }
   </style>
 </head>
 <body>
@@ -122,7 +155,7 @@
     const VISOR_COLORS = {
       idle:           '#72d6ff',
       thinking:       '#7830DC',
-      working:        '#72d6ff',
+      working:        '#58C4F0',
       needs_approval: '#D71921',
       success:        '#2FDFB0',
       error:          '#FF4455',
@@ -135,18 +168,15 @@
           <path d="M12 44h8v6h-8z" fill="#373D4D"/>
           <path d="M10 48h10v4h-10z" fill="#1C1C21"/>
         </g>
-
         <g id="p-legs">
           <path d="M34 54h2v4h-2zM42 54h2v4h-2z" fill="#A86E79"/>
           <path d="M32 58h6v2h-6zM40 58h6v2h-6z" fill="#1C1C21"/>
         </g>
-
         <g class="p-body-group">
           <path d="M28 32h20v24H28z" fill="#1C1C21"/>
           <path d="M30 34h16v20H30z" fill="#7A8296"/>
           <path d="M30 48h16v6H30z" fill="#5D647A"/>
           <path d="M32 34h4v4h-4zM38 34h4v4h-4z" fill="#98A0B3"/>
-
           <g id="p-wing">
             <path d="M22 38h18v16h-18z" fill="#1C1C21"/>
             <path d="M24 40h14v12H24z" fill="#98A0B3"/>
@@ -154,23 +184,20 @@
             <path d="M24 50h12v2H24z" fill="#373D4D"/>
           </g>
         </g>
-
         <g class="p-head-unit">
           <path d="M38 24h12v10H38z" fill="#1C1C21"/>
           <path d="M40 26h8v6H40z" fill="#7A8296"/>
           <path d="M40 27h8v2H40z" fill="#7EA8A6" opacity="0.6"/>
-
           <path d="M42 10h16v16H42z" fill="#1C1C21"/>
           <path d="M44 12h12v12H44z" fill="#7A8296"/>
-          <path d="M44 12h6v6h-6z" fill="#98A0B3"/> <rect x="52" y="16" width="2" height="2" fill="#1C1C21"/>
+          <path d="M44 12h6v6h-6z" fill="#98A0B3"/>
+          <rect x="52" y="16" width="2" height="2" fill="#1C1C21"/>
           <rect x="53" y="16" width="1" height="1" fill="#fff"/>
-
           <g id="p-visor-group">
             <rect x="50" y="14" width="10" height="8" fill="#1C1C21"/>
             <rect class="mascot-visor" x="51" y="15" width="8" height="6" fill="#72d6ff"/>
             <rect x="52" y="15" width="4" height="2" fill="#B4E8FF" opacity="0.8"/>
           </g>
-
           <path d="M58 20h6v4h-6z" fill="#1C1C21"/>
           <path d="M58 20h4v2h-4z" fill="#3B3B45"/>
         </g>
@@ -185,19 +212,25 @@
         slot.className = `mascot-slot s-${s.status}`;
         slot.dataset.id = s.id;
         slot.innerHTML = `
-          <div class="approval-btns">
-            <button class="abtn abtn-deny">✕ DENY</button>
-            <button class="abtn abtn-approve">✓ ALLOW</button>
-          </div>
           <div class="thought-bubble">
-            <span class="bubble-text">ALLOW ACCESS?</span>
-            <span class="bubble-task">${s.task || 'SECURE CONNECT'}</span>
+            <img class="cloud-bg" src="cloud-bubble.svg" alt="">
+            <div class="cloud-content">
+              <img class="bubble-title" src="text-allow-access.svg" alt="ALLOW ACCESS?">
+              <div class="task-strip">
+                <img src="text-strip.svg" alt="">
+                <div class="task-strip-text">${s.task || ''}</div>
+              </div>
+              <div class="approval-btns">
+                <button class="abtn abtn-deny"><img src="btn-deny.svg" alt="DENY"></button>
+                <button class="abtn abtn-allow"><img src="btn-allow.svg" alt="ALLOW"></button>
+              </div>
+            </div>
           </div>
           <div class="mascot-figure">${buildPigeonSVG()}</div>
           <div class="agent-name">${s.name || s.id}</div>
         `;
         slot.querySelector('.abtn-deny').addEventListener('click', () => sendAction(s.id, 'deny'));
-        slot.querySelector('.abtn-approve').addEventListener('click', () => sendAction(s.id, 'approve'));
+        slot.querySelector('.abtn-allow').addEventListener('click', () => sendAction(s.id, 'approve'));
         startAnimations(slot);
         area.appendChild(slot);
       }
@@ -216,8 +249,8 @@
       slot.className = `mascot-slot s-${s.status}`;
       const visor = slot.querySelector('.mascot-visor');
       if (visor) visor.setAttribute('fill', VISOR_COLORS[s.status] || VISOR_COLORS.idle);
-      const bubbleTask = slot.querySelector('.bubble-task');
-      if (bubbleTask) bubbleTask.textContent = s.task || 'SECURE CONNECT';
+      const taskText = slot.querySelector('.task-strip-text');
+      if (taskText) taskText.textContent = s.task || '';
       const agentName = slot.querySelector('.agent-name');
       if (agentName) agentName.textContent = s.name || s.id;
       handleStateSync(slot, s.status);
@@ -226,7 +259,6 @@
     function handleStateSync(slot, status) {
       const head = slot.querySelector('.p-head-unit');
       head.getAnimations().forEach(a => { if(a.id !== 'idle') a.cancel() });
-
       if (status === 'working' || status === 'needs_approval') {
         const speed = status === 'needs_approval' ? 400 : 700;
         const bob = head.animate([
@@ -241,15 +273,11 @@
     function startAnimations(slot) {
       const body = slot.querySelector('.p-body-group');
       const head = slot.querySelector('.p-head-unit');
-
-      // Breathing
       body.animate([
         { transform: 'scaleY(1)' },
         { transform: 'scaleY(0.97)', offset: 0.5 },
         { transform: 'scaleY(1)' }
       ], { duration: 3000, iterations: Infinity, easing: 'ease-in-out' });
-
-      // Subtle Head Idle Swivel
       const idleMood = () => {
         setTimeout(() => {
           if (!head.getAnimations().some(a => a.id === 'active-anim')) {
@@ -269,7 +297,6 @@
       const all = Object.values(sessions);
       const hasNonMain = all.some(s => s.id !== 'main');
       all.forEach(s => {
-        // Hide main entirely when any other session exists
         if (s.id === 'main' && hasNonMain) {
           const existing = document.querySelector(`[data-id="${s.id}"]`);
           if (existing) existing.remove();
@@ -278,13 +305,11 @@
         const slot = getOrCreateSlot(s);
         updateSlot(slot, s);
       });
-      // Remove slots for sessions that no longer exist
       document.querySelectorAll('#mascots-area [data-id]').forEach(slot => {
         if (!sessions[slot.dataset.id]) slot.remove();
       });
     }
 
-    // Connect to SSE stream
     const evtSource = new EventSource('http://localhost:49152/stream');
     evtSource.addEventListener('update', e => {
       const data = JSON.parse(e.data);

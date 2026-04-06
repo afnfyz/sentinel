@@ -109,7 +109,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func setupWindow() {
         let width: CGFloat = 300
-        let height: CGFloat = 280
+        let height: CGFloat = 400
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
         let rect = NSRect(
             x: screenRect.maxX - width - 20,
@@ -233,14 +233,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 .contains { ($0["status"] as? String) == "needs_approval" }
             DispatchQueue.main.async {
                 if needsApproval {
-                    // Raise to screenSaver level so the mascot floats above everything
                     self.window.level = .screenSaver
-                    // orderFrontRegardless ensures the window appears even when
-                    // Sentinel is not the active app — without stealing keyboard
-                    // focus from whatever the user is working in (e.g. Safari, Figma).
-                    // This avoids the "double approval" problem where NSApp.activate
-                    // would yank focus to VSCode, making the user think they need
-                    // to approve again in the Claude Code UI.
                     self.window.orderFrontRegardless()
                     self._wasNeedsApproval = true
                 } else {

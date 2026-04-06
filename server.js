@@ -2,12 +2,15 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
+const path = require('path');
 const morgan = require('morgan');
 const SSE = require('express-sse');
 
 const app = express();
 const PORT = 49152;
-const STATE_FILE = 'state.json';
+const STATE_FILE = path.join(__dirname, 'state.json');
+
+const VALID_STATUSES = new Set(['idle','thinking','working','needs_approval','success','error','warning']);
 
 // --- State Management ---
 let sessions = {};
@@ -24,6 +27,7 @@ function loadState() {
       const parsed = JSON.parse(data);
       sessions = parsed.sessions || { 'main': { id: 'main', name: 'Gemini', status: 'idle', task: 'Ready', timestamp: Date.now() } };
       history = parsed.history || [];
+      if (history.length > 20) history = history.slice(0, 20);
       console.log(`[State] Loaded state from ${STATE_FILE}`);
     } else {
       console.log(`[State] ${STATE_FILE} not found, initializing default state.`);
@@ -37,12 +41,17 @@ function loadState() {
   }
 }
 
+// Coalesced async write — multiple calls within the same tick produce one write
+let _saveScheduled = false;
 function saveState() {
-  try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ sessions, history }, null, 2));
-  } catch (error) {
-    console.error('[State] Error saving state:', error.message);
-  }
+  if (_saveScheduled) return;
+  _saveScheduled = true;
+  setImmediate(() => {
+    _saveScheduled = false;
+    fs.writeFile(STATE_FILE, JSON.stringify({ sessions, history }, null, 2), (err) => {
+      if (err) console.error('[State] Error saving state:', err.message);
+    });
+  });
 }
 
 // --- Middlewares ---
@@ -71,8 +80,13 @@ function addLog(id, status, task) {
 
 // --- Routes ---
 app.post('/update', (req, res) => {
-  const { id, name, status, task } = req.body;
-  const sessionId = id || 'main';
+  let { id, name, status, task } = req.body;
+
+  // Validate
+  if (!VALID_STATUSES.has(status)) return res.status(400).json({ error: 'Invalid status' });
+  const sessionId = (typeof id === 'string' && id.trim()) ? id.trim() : 'main';
+  if (name) name = String(name).slice(0, 64);
+  if (task) task = String(task).slice(0, 256);
 
   if (!sessions[sessionId]) {
     sessions[sessionId] = { id: sessionId, name: name || sessionId, status: 'idle', task: 'Initializing...', timestamp: Date.now() };
@@ -95,10 +109,11 @@ app.post('/update', (req, res) => {
         if (sessionId === 'main') {
           sessions[sessionId] = { id: sessionId, name: sessions[sessionId]?.name || 'Gemini', status: 'idle', task: 'Ready', timestamp: Date.now() };
           addLog(sessionId, 'idle', 'Ready');
+          // addLog already calls saveState — no extra call needed
         } else {
           delete sessions[sessionId]; // Remove sub-agents when done
+          saveState(); // no addLog here, must save explicitly
         }
-        saveState();
       }
     }, 4000);
   }
@@ -107,29 +122,28 @@ app.post('/update', (req, res) => {
 
 app.get('/wait-approval', (req, res) => {
   const sessionId = req.query.id || 'main';
-  
+
   if (approvalResolvers[sessionId]) {
       return res.status(409).json({ error: 'Already waiting for approval for this session.' });
   }
 
   console.log(`[Gemini] Waiting for user approval for session: ${sessionId}`);
-  
+
   // Set a timeout for approval
   const timeout = setTimeout(() => {
     if (approvalResolvers[sessionId]) {
       console.log(`[Gemini] Timeout waiting for approval for session: ${sessionId}`);
       const deniedTask = 'Approval timed out.';
-      addLog(sessionId, 'warning', deniedTask);
       sessions[sessionId] = { ...sessions[sessionId], status: 'warning', task: deniedTask, timestamp: Date.now() };
       approvalResolvers[sessionId]('timeout');
       delete approvalResolvers[sessionId];
-      saveState();
+      addLog(sessionId, 'warning', deniedTask);
     }
   }, 30000); // 30 seconds timeout
 
   approvalResolvers[sessionId] = (action) => {
     clearTimeout(timeout);
-    res.json({ action });
+    if (!res.headersSent) res.json({ action });
   };
 
   res.on('close', () => {
@@ -137,12 +151,10 @@ app.get('/wait-approval', (req, res) => {
       console.log(`[Gemini] Connection closed while waiting for approval for session: ${sessionId}. Cleaning up.`);
       clearTimeout(timeout);
       delete approvalResolvers[sessionId];
-      // Update session to indicate disconnection or waiting state if appropriate
       if (sessions[sessionId]) {
-          sessions[sessionId].status = 'warning'; // Or a new 'disconnected' status
+          sessions[sessionId].status = 'warning';
           sessions[sessionId].task = 'Connection lost during wait.';
-          addLog(sessionId, sessions[sessionId].status, sessions[sessionId].task);
-          saveState();
+          addLog(sessionId, 'warning', 'Connection lost during wait.');
       }
     }
   });
@@ -155,38 +167,37 @@ app.get('/state', (req, res) => {
 app.post('/action', (req, res) => {
   const { id, action } = req.body;
   const sessionId = id || 'main';
-  
+
   if (!sessions[sessionId]) {
       return res.status(404).json({ error: `Session ${sessionId} not found.` });
   }
 
   if (approvalResolvers[sessionId]) {
     let logTask = `User ${action} request.`;
-    let newStatus = sessions[sessionId].status; // Keep current status by default
+    let newStatus = sessions[sessionId].status;
 
     if (action === 'approve') {
         logTask = `Approved! Resuming: ${sessions[sessionId].pendingTask || 'Task'}`;
-        newStatus = 'working'; // Move to working after approval
-    } else { // Deny
+        newStatus = 'working';
+    } else {
         logTask = `Request Denied.`;
-        newStatus = 'warning'; // Set to warning on denial
+        newStatus = 'warning';
     }
-    
-    sessions[sessionId] = { 
-      ...sessions[sessionId], 
-      status: newStatus, 
-      task: logTask, 
-      timestamp: Date.now() 
+
+    sessions[sessionId] = {
+      ...sessions[sessionId],
+      status: newStatus,
+      task: logTask,
+      timestamp: Date.now()
     };
-    
-    addLog(sessionId, newStatus, logTask);
+
     approvalResolvers[sessionId](action);
     delete approvalResolvers[sessionId];
-    saveState();
+    addLog(sessionId, newStatus, logTask);
   } else {
-      addLog(sessionId, 'info', `UI action received: ${action}`);
+      addLog(sessionId, 'warning', `UI action received with no pending approval: ${action}`);
   }
-  
+
   res.json({ success: true });
 });
 
@@ -210,6 +221,19 @@ app.post('/session-end', (req, res) => {
 
 // --- Initialization ---
 loadState();
+
+// Purge stale non-main sessions left over from previous runs
+Object.keys(sessions).forEach(id => {
+  if (id !== 'main') {
+    delete sessions[id];
+  } else {
+    // Reset main to idle in case it was left in a transient state
+    sessions[id].status = 'idle';
+    sessions[id].task = 'Ready';
+  }
+});
+saveState();
+
 app.listen(PORT, () => {
   console.log(`Gemini Sentinel Mission Control Bridge active on http://localhost:${PORT}`);
 });

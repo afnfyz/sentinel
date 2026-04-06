@@ -3,10 +3,18 @@ set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Kill any existing instances
+if ! command -v node > /dev/null 2>&1; then
+  echo "Error: node not found in PATH" >&2
+  exit 1
+fi
+
+# Kill any existing instances and wait for them to actually die
 pkill -f "node.*server.js" 2>/dev/null || true
 pkill -f "GeminiSentinel" 2>/dev/null || true
-sleep 0.5
+for i in $(seq 1 10); do
+  pgrep -f "node.*server.js" > /dev/null 2>&1 || break
+  sleep 0.2
+done
 
 # Start the server
 node "$DIR/server.js" >> "$DIR/server.log" 2>&1 &

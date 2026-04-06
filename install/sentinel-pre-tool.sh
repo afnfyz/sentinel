@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Sentinel PreToolUse hook for Claude Code.
-# Approval is handled ONLY by the Sentinel mascot — Claude Code's own permission
-# dialog is bypassed because settings.json allow list covers everything.
-# The hook decides independently what needs human approval by checking what
-# ISN'T in the settings.json allow list (via fnmatch).
+# Two approval surfaces, never both at once:
+#   - VS Code focused → return allow immediately; Claude Code's chat panel gates it
+#   - VS Code not focused → block here and show Sentinel mascot; mascot is the gate
 
 INPUT=$(cat)
 INPUT_TMP=$(mktemp /tmp/sentinel-input-XXXXXX)
@@ -13,6 +12,27 @@ printf '%s' "$INPUT" > "$INPUT_TMP"
 # chat panel will handle approval. No mascot needed, no double prompt.
 FRONTMOST=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
 if [[ "$FRONTMOST" == *"Code"* ]] || [[ "$FRONTMOST" == *"Electron"* ]] || [[ "$FRONTMOST" == *"cursor"* ]]; then
+    # Still update mascot status (non-blocking) so pigeon stays animated
+    TOOL=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open(sys.argv[1]))
+    t=d.get('tool_name','tool')
+    i=d.get('tool_input',{})
+    if t=='Bash':
+        c=i.get('command','')[:55]
+        print(f'Bash: {c}' if c else t)
+    elif t in ('Write','Edit','NotebookEdit'):
+        p=i.get('file_path',i.get('notebook_path',''))
+        print(f'{t}: {p.split(\"/\")[-1]}' if p else t)
+    else: print(t)
+except: print('tool')
+" "$INPUT_TMP" 2>/dev/null || echo "tool")
+    TOOL_SAFE=$(echo "$TOOL" | tr '|"' '/ ' | tr '\n\r' '  ')
+    curl -s --max-time 2 -X POST http://localhost:49152/update \
+      -H 'Content-Type: application/json' \
+      -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"working\",\"task\":\"$TOOL_SAFE\"}" \
+      > /dev/null 2>&1 &
     rm -f "$INPUT_TMP"
     echo '{"decision":"allow"}'
     exit 0
