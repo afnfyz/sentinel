@@ -13,8 +13,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var serverProcess: Process?
     var watchTimer: Timer?
     var dragStart: NSPoint?
+    var _checkingServer = false
+    var _wasNeedsApproval = false   // tracks previous approval state to fire activate only once
 
-    let sentinelDir = "/Users/afnan_dfx/projects/gemini-sentinel"
+    let sentinelDir: String = {
+        let url = URL(fileURLWithPath: Bundle.main.bundlePath)
+        // If launched as .app bundle, go up one level to project root
+        if url.pathExtension == "app" {
+            return url.deletingLastPathComponent().path
+        }
+        // If launched as bare binary (e.g. swiftc output), bundlePath is the binary itself
+        return url.deletingLastPathComponent().path
+    }()
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupStatusBar()
@@ -22,7 +32,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupDrag()
         startServerIfNeeded()
         watchTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
-            self?.startServerIfNeeded()
+            DispatchQueue.global(qos: .background).async {
+                self?.startServerIfNeeded()
+            }
             self?.checkForApproval()
         }
     }
@@ -89,14 +101,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func quitApp() {
         serverProcess?.terminate()
+        serverProcess?.waitUntilExit()  // give server time to flush state.json
         NSApp.terminate(nil)
     }
 
     // MARK: – Window
 
     func setupWindow() {
-        let width: CGFloat = 400
-        let height: CGFloat = 200
+        let width: CGFloat = 300
+        let height: CGFloat = 280
         let screenRect = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
         let rect = NSRect(
             x: screenRect.maxX - width - 20,
@@ -125,9 +138,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         webView.autoresizingMask = [.width, .height]
         window.contentView?.addSubview(webView)
 
-        let path = "\(sentinelDir)/index.html"
+        let htmlPath = "\(sentinelDir)/index.html"
         webView.loadFileURL(
-            URL(fileURLWithPath: path),
+            URL(fileURLWithPath: htmlPath),
             allowingReadAccessTo: URL(fileURLWithPath: sentinelDir)
         )
 
@@ -184,6 +197,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func startServerIfNeeded() {
+        guard !_checkingServer else { return }
+        _checkingServer = true
+        defer { _checkingServer = false }
+
         guard !isServerRunning() else { return }
         print("[Sentinel] Server not running — starting...")
         let process = Process()
@@ -191,28 +208,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         process.arguments = ["node", "\(sentinelDir)/server.js"]
         process.currentDirectoryURL = URL(fileURLWithPath: sentinelDir)
         let logURL = URL(fileURLWithPath: "\(sentinelDir)/server.log")
+        if !FileManager.default.fileExists(atPath: logURL.path) {
+            FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        }
         let logHandle = try? FileHandle(forWritingTo: logURL)
         process.standardOutput = logHandle ?? FileHandle.nullDevice
         process.standardError = logHandle ?? FileHandle.nullDevice
-        try? process.run()
-        serverProcess = process
+        do {
+            try process.run()
+            serverProcess = process
+        } catch {
+            print("[Sentinel] Failed to start server: \(error)")
+        }
     }
 
     func checkForApproval() {
         guard let url = URL(string: "http://localhost:49152/state") else { return }
         URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard let data = data,
+            guard let self = self,
+                  let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let sessions = json["sessions"] as? [String: Any] else { return }
             let needsApproval = sessions.values.compactMap { $0 as? [String: Any] }
                 .contains { ($0["status"] as? String) == "needs_approval" }
             DispatchQueue.main.async {
                 if needsApproval {
-                    self?.window.level = .screenSaver
-                    self?.window.orderFront(nil)
-                    NSApp.activate(ignoringOtherApps: true)
+                    // Raise to screenSaver level so the mascot floats above everything
+                    self.window.level = .screenSaver
+                    // orderFrontRegardless ensures the window appears even when
+                    // Sentinel is not the active app — without stealing keyboard
+                    // focus from whatever the user is working in (e.g. Safari, Figma).
+                    // This avoids the "double approval" problem where NSApp.activate
+                    // would yank focus to VSCode, making the user think they need
+                    // to approve again in the Claude Code UI.
+                    self.window.orderFrontRegardless()
+                    self._wasNeedsApproval = true
                 } else {
-                    self?.window.level = .floating
+                    self.window.level = .floating
+                    self._wasNeedsApproval = false
                 }
             }
         }.resume()
@@ -225,6 +258,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func applicationWillTerminate(_ aNotification: Notification) {
         watchTimer?.invalidate()
         serverProcess?.terminate()
+        serverProcess?.waitUntilExit()  // flush state.json before exit
     }
 }
 

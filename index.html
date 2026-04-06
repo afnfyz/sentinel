@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Sentinel</title>
+  <title>Sentinel - Pixel Perfect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -13,683 +13,284 @@
       width: 100%; height: 100%;
       background: transparent;
       overflow: hidden;
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
     }
 
     body {
       display: flex;
       align-items: flex-end;
       justify-content: flex-start;
-      padding: 12px;
-      gap: 10px;
+      padding: 20px;
+      gap: 24px;
     }
 
-    /* ════════════════════════════════════════
-       MASCOT SLOT — the whole card per agent
-    ════════════════════════════════════════ */
     .mascot-slot {
       position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0;
-      opacity: 1;
-      transition: opacity 600ms ease-out;
-      pointer-events: none;
-    }
-    .mascot-slot.hidden { opacity: 0; pointer-events: none; }
-
-    /* ── Glassmorphism HUD card ── */
-    .hud-card {
-      position: relative;
-      width: 110px;
-      background: rgba(13,17,23,0.82);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
-      padding: 12px 10px 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      transition: border-color 400ms ease-out, box-shadow 400ms ease-out;
+      transition: opacity 400ms;
     }
 
-    /* Status glow on card — replaces the ring */
-    .s-idle     .hud-card { border-color: rgba(47,158,143,0.2); box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
-    .s-thinking .hud-card { border-color: rgba(138,43,226,0.4); box-shadow: 0 4px 24px rgba(138,43,226,0.15); }
-    .s-working  .hud-card { border-color: rgba(47,158,143,0.5); box-shadow: 0 4px 24px rgba(47,158,143,0.2), 0 0 40px rgba(47,158,143,0.08); }
-    .s-approval .hud-card { border-color: rgba(215,25,33,0.7);  box-shadow: 0 4px 24px rgba(215,25,33,0.3),  0 0 48px rgba(215,25,33,0.12); }
-    .s-success  .hud-card { border-color: rgba(47,158,143,0.8); box-shadow: 0 4px 32px rgba(47,158,143,0.35), 0 0 56px rgba(47,158,143,0.15); }
-    .s-error    .hud-card,
-    .s-warning  .hud-card { border-color: rgba(212,168,67,0.5); box-shadow: 0 4px 24px rgba(212,168,67,0.2); }
-
-    /* ── Agent name ── */
-    .agent-name {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.35);
-      text-align: center;
-      width: 100%;
-    }
-
-    /* ── Pigeon wrapper — glow aura instead of ring ── */
-    .mascot-figure {
-      position: relative;
-      width: 80px;
-      height: 80px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-    }
-
-    /* Glow aura behind the pigeon */
-    .mascot-aura {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      opacity: 0;
-      transition: opacity 400ms ease-out, background 400ms ease-out;
-      pointer-events: none;
-      filter: blur(12px);
-    }
-    .s-thinking .mascot-aura { background: radial-gradient(circle, rgba(138,43,226,0.35) 0%, transparent 70%); opacity: 1; }
-    .s-working  .mascot-aura { background: radial-gradient(circle, rgba(47,158,143,0.4)  0%, transparent 70%); opacity: 1; }
-    .s-approval .mascot-aura { background: radial-gradient(circle, rgba(215,25,33,0.5)   0%, transparent 70%); opacity: 1; animation: aura-pulse 0.6s ease-in-out infinite; }
-    .s-success  .mascot-aura { background: radial-gradient(circle, rgba(47,158,143,0.5)  0%, transparent 70%); opacity: 1; }
-
-    @keyframes aura-pulse {
-      0%,100% { transform: scale(1);    opacity: 1; }
-      50%      { transform: scale(1.15); opacity: 0.7; }
-    }
-
-    .mascot-svg {
-      width: 80px;
-      height: 80px;
-      overflow: visible;
-      pointer-events: none;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* ════════════════════════════════════════
-       PIGEON ANIMATIONS
-    ════════════════════════════════════════ */
-    .mascot-slot.s-idle     .mascot-body-group { animation: pigeon-walk  1.1s steps(1)       infinite; }
-    .mascot-slot.s-thinking .mascot-body-group { animation: pigeon-think 2.4s ease-in-out     infinite; }
-    .mascot-slot.s-working  .mascot-body-group { animation: pigeon-peck  0.45s ease-in-out    infinite; }
-    .mascot-slot.s-approval .mascot-body-group { animation: pigeon-alert 0.7s ease-in-out     infinite; }
-    .mascot-slot.s-success  .mascot-body-group { animation: pigeon-flap  0.5s ease-out        3;        }
-    .mascot-slot.s-error    .mascot-body-group,
-    .mascot-slot.s-warning  .mascot-body-group { animation: pigeon-sad   3s   ease-in-out     infinite; }
-
-    @keyframes pigeon-walk  {
-      0%   { transform: translateX(0px)  translateY(0px); }
-      25%  { transform: translateX(3px)  translateY(-2px); }
-      50%  { transform: translateX(0px)  translateY(0px); }
-      75%  { transform: translateX(-1px) translateY(-1px); }
-    }
-    @keyframes pigeon-think {
-      0%,100% { transform: rotate(0deg)   translateY(0px); }
-      20%,40% { transform: rotate(-12deg) translateY(-1px); }
-      60%,80% { transform: rotate(8deg)   translateY(-1px); }
-    }
-    @keyframes pigeon-peck {
-      0%,100% { transform: translateX(0px) translateY(0px)  rotate(0deg); }
-      30%,50% { transform: translateX(5px) translateY(4px)  rotate(8deg); }
-    }
-    @keyframes pigeon-alert {
-      0%,100% { transform: scaleX(1)    scaleY(1)    translateY(0px); }
-      20%,35% { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
-      55%     { transform: scaleX(0.96) scaleY(0.97) translateY(1px); }
-      70%     { transform: scaleX(1.08) scaleY(1.06) translateY(-3px); }
-    }
-    @keyframes pigeon-flap {
-      0%   { transform: translateY(0px)   scaleX(1)    scaleY(1); }
-      25%  { transform: translateY(-10px) scaleX(1.2)  scaleY(0.85); }
-      50%  { transform: translateY(-14px) scaleX(0.88) scaleY(1.1); }
-      75%  { transform: translateY(-6px)  scaleX(1.12) scaleY(0.92); }
-    }
-    @keyframes pigeon-sad {
-      0%,100% { transform: rotate(0deg)  translateY(0px) scaleY(1); }
-      30%     { transform: rotate(-5deg) translateY(2px) scaleY(0.95); }
-      60%     { transform: rotate(3deg)  translateY(2px) scaleY(0.95); }
-    }
-
-    /* ════════════════════════════════════════
-       STATUS LINE
-    ════════════════════════════════════════ */
-    .status-line {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-    .status-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      background: rgba(255,255,255,0.2);
-      transition: background 300ms ease-out;
-    }
-    .s-idle     .status-dot { background: #2F9E8F; }
-    .s-thinking .status-dot { background: #8A2BE2; animation: dot-blink 1.4s ease-in-out infinite; }
-    .s-working  .status-dot { background: #2F9E8F; animation: dot-blink 0.7s ease-in-out infinite; }
-    .s-approval .status-dot { background: #D71921; animation: dot-blink 0.35s ease-in-out infinite; }
-    .s-success  .status-dot { background: #2F9E8F; }
-    .s-error    .status-dot,
-    .s-warning  .status-dot { background: #D4A843; }
-
-    @keyframes dot-blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-
-    .status-text {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.4);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      flex: 1;
-      transition: color 300ms ease-out;
-    }
-    .s-idle     .status-text { color: rgba(47,158,143,0.7); }
-    .s-thinking .status-text { color: rgba(138,43,226,0.9); }
-    .s-working  .status-text { color: rgba(47,158,143,0.9); }
-    .s-approval .status-text { color: rgba(215,25,33,0.95); }
-    .s-success  .status-text { color: rgba(47,158,143,1); }
-    .s-error    .status-text,
-    .s-warning  .status-text { color: rgba(212,168,67,0.9); }
-
-    /* ════════════════════════════════════════
-       TASK TEXT (pigeon-flavored)
-    ════════════════════════════════════════ */
-    .task-text {
-      font-size: 10px;
-      color: rgba(255,255,255,0.5);
-      line-height: 1.4;
-      text-align: center;
-      width: 100%;
-      min-height: 14px;
-      word-break: break-all;
-    }
-
-    /* ════════════════════════════════════════
-       SPEECH BUBBLE — approval context
-    ════════════════════════════════════════ */
-    .speech-bubble {
-      display: none;
-      position: absolute;
-      bottom: calc(100% + 10px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: 160px;
-      background: rgba(13,17,23,0.95);
-      border: 1px solid rgba(215,25,33,0.6);
-      border-radius: 12px;
-      padding: 10px 12px;
-      pointer-events: none;
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      box-shadow: 0 4px 20px rgba(215,25,33,0.25);
-    }
-    /* Arrow pointing down to mascot */
-    .speech-bubble::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 6px solid transparent;
-      border-top-color: rgba(215,25,33,0.6);
-    }
-    .speech-bubble-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 7px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: #D71921;
-      margin-bottom: 4px;
-    }
-    .speech-bubble-cmd {
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      color: rgba(255,255,255,0.9);
-      line-height: 1.4;
-      word-break: break-all;
-    }
-    .s-approval .speech-bubble { display: block; }
-
-    /* ════════════════════════════════════════
-       APPROVAL BUTTONS
-    ════════════════════════════════════════ */
+    /* APPROVAL BUTTONS — float above the mascot figure */
     .approval-btns {
       display: none;
-      gap: 5px;
-      width: 100%;
+      gap: 10px;
+      margin-bottom: 10px;
+      position: relative;
+      z-index: 20;
     }
-    .s-approval .approval-btns { display: flex; pointer-events: auto; }
+    .s-needs_approval .approval-btns { display: flex; }
 
     .abtn {
-      flex: 1;
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      padding: 6px 4px;
-      border-radius: 8px;
+      font-family: 'Bangers', cursive;
+      font-size: 18px;
+      letter-spacing: 0.05em;
+      padding: 8px 20px;
+      border-radius: 50px;
+      border: 3px solid #111;
       cursor: pointer;
-      transition: opacity 150ms, transform 80ms;
-      pointer-events: auto;
-      backdrop-filter: blur(8px);
+      /* chunky comic-book drop shadow */
+      box-shadow: 3px 4px 0px #111;
+      transition: transform 80ms, box-shadow 80ms;
+      user-select: none;
     }
-    .abtn:hover  { opacity: 0.8; }
-    .abtn:active { opacity: 0.55; transform: scale(0.97); }
-    .abtn-approve {
-      background: rgba(47,158,143,0.15);
-      border: 1px solid rgba(47,158,143,0.7);
-      color: #2F9E8F;
+    .abtn:active {
+      transform: translate(2px, 3px);
+      box-shadow: 1px 1px 0px #111;
     }
     .abtn-deny {
-      background: rgba(215,25,33,0.15);
-      border: 1px solid rgba(215,25,33,0.7);
-      color: #D71921;
+      background: #FF4455;
+      color: #fff;
+    }
+    .abtn-approve {
+      background: #2FDFB0;
+      color: #111;
     }
 
-    /* ════════════════════════════════════════
-       LOG POPOVER
-    ════════════════════════════════════════ */
-    #log-popover {
-      position: fixed;
-      width: 280px;
-      background: rgba(13,17,23,0.96);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 16px;
-      overflow: hidden;
-      opacity: 0;
+    /* THOUGHT BUBBLE — sits between buttons and mascot figure, in normal flow */
+    .thought-bubble {
+      display: none;
+      background: #fff;
+      border: 3px solid #111;
+      border-radius: 20px;
+      padding: 8px 14px;
+      min-width: 130px;
+      max-width: 160px;
+      filter: drop-shadow(3px 4px 0px #111);
       pointer-events: none;
-      transition: opacity 200ms ease-out, transform 200ms ease-out;
-      backdrop-filter: blur(28px);
-      -webkit-backdrop-filter: blur(28px);
-      box-shadow: 0 12px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(47,158,143,0.1);
-      transform: scale(0.95) translateY(4px);
-      z-index: 9999;
+      margin-bottom: 8px;
+      text-align: center;
     }
-    #log-popover.open {
-      opacity: 1;
-      pointer-events: auto;
-      transform: scale(1) translateY(0);
-    }
-    .popover-header {
+    .s-needs_approval .thought-bubble { display: block; }
+    .bubble-text { font-family: 'Bangers', cursive; font-size: 15px; color: #D71921; display: block; }
+    .bubble-task { font-family: 'Space Mono', monospace; font-size: 9px; color: #333; display: block; margin-top: 2px; word-break: break-all; }
+
+    /* FIGURE & SVG */
+    .mascot-figure {
+      position: relative;
+      width: 120px;
+      height: 120px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px 8px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+      align-items: flex-end;
+      justify-content: center;
+      cursor: pointer;
     }
-    .popover-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: #2F9E8F;
+    .mascot-svg {
+      width: 100px;
+      height: 100px;
+      image-rendering: pixelated;
     }
-    .popover-task {
-      font-size: 10px;
-      color: rgba(255,255,255,0.5);
-      max-width: 150px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .log-feed {
-      max-height: 220px;
-      overflow-y: auto;
-    }
-    .log-feed::-webkit-scrollbar { width: 2px; }
-    .log-feed::-webkit-scrollbar-thumb { background: rgba(47,158,143,0.3); border-radius: 1px; }
-    .log-row {
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-      padding: 6px 14px;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-    .log-row:last-child { border-bottom: none; }
-    .log-dot {
-      width: 4px; height: 4px;
-      border-radius: 50%;
-      flex-shrink: 0;
-      margin-top: 4px;
-      background: rgba(255,255,255,0.15);
-    }
-    .log-row.ls-success        .log-dot { background: #2F9E8F; }
-    .log-row.ls-working        .log-dot { background: #2F9E8F; }
-    .log-row.ls-thinking       .log-dot { background: #8A2BE2; }
-    .log-row.ls-needs_approval .log-dot { background: #D71921; }
-    .log-row.ls-error          .log-dot,
-    .log-row.ls-warning        .log-dot { background: #D4A843; }
-    .log-text {
-      flex: 1;
-      font-size: 11px;
-      color: rgba(255,255,255,0.45);
-      line-height: 1.4;
-    }
-    .log-text strong { color: rgba(255,255,255,0.8); font-weight: 500; }
-    .log-time {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      color: rgba(255,255,255,0.18);
-      flex-shrink: 0;
-    }
-    .log-empty {
-      padding: 20px 14px;
+
+    /* ANIMATION ANCHORS */
+    .p-head-unit { transform-origin: 45px 35px; }
+    .p-body-group { transform-origin: 40px 60px; }
+
+    .agent-name {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
-      letter-spacing: 0.1em;
-      color: rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.4);
+      margin-top: 8px;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      text-align: center;
     }
   </style>
 </head>
 <body>
   <div id="mascots-area"></div>
-  <div id="log-popover">
-    <div class="popover-header">
-      <span class="popover-title"></span>
-      <span class="popover-task"></span>
-    </div>
-    <div id="log-feed" class="log-feed"></div>
-  </div>
 
   <script>
-    const IDLE_TIMEOUT = 120000;
-
-    let sessions = {}, history = [], hideTimers = {}, openLog = null, eventSource = null;
-
-    // ── Pigeon-flavored status labels ─────────────────────────────────────
-    const STATUS_LABELS = {
-      idle:           'Roosting...',
-      thinking:       'Scouting...',
-      working:        'Pecking...',
-      needs_approval: 'Alert!',
-      success:        'Delivered!',
-      error:          'Ruffled',
-      warning:        'Wary',
+    const VISOR_COLORS = {
+      idle:           '#72d6ff',
+      thinking:       '#7830DC',
+      working:        '#72d6ff',
+      needs_approval: '#D71921',
+      success:        '#2FDFB0',
+      error:          '#FF4455',
+      warning:        '#FFB830'
     };
 
-    // ── Pixel-art pigeon SVG ──────────────────────────────────────────────
     function buildPigeonSVG() {
       return `<svg class="mascot-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
-  <g class="mascot-body-group" style="transform-origin:32px 52px">
-    <!-- Shadow -->
-    <ellipse cx="34" cy="61" rx="14" ry="2.5" fill="rgba(0,0,0,0.2)"/>
-    <!-- Feet -->
-    <rect x="26" y="52" width="2" height="5" fill="#E8AAB8"/>
-    <rect x="24" y="57" width="6" height="2" fill="#E8AAB8"/>
-    <rect x="23" y="59" width="2" height="1" fill="#111"/>
-    <rect x="27" y="59" width="2" height="1" fill="#111"/>
-    <rect x="29" y="59" width="1" height="1" fill="#111"/>
-    <rect x="34" y="52" width="2" height="5" fill="#E8AAB8"/>
-    <rect x="32" y="57" width="6" height="2" fill="#E8AAB8"/>
-    <rect x="31" y="59" width="2" height="1" fill="#111"/>
-    <rect x="35" y="59" width="2" height="1" fill="#111"/>
-    <rect x="37" y="59" width="1" height="1" fill="#111"/>
-    <!-- Tail -->
-    <rect x="10" y="42" width="4"  height="3"  fill="#404C5F"/>
-    <rect x="11" y="40" width="4"  height="3"  fill="#404C5F"/>
-    <rect x="12" y="38" width="3"  height="3"  fill="#4A5568"/>
-    <rect x="13" y="36" width="2"  height="3"  fill="#4A5568"/>
-    <rect x="11" y="43" width="1"  height="1"  fill="#64748B"/>
-    <rect x="13" y="41" width="1"  height="1"  fill="#64748B"/>
-    <!-- Lower body -->
-    <rect x="16" y="40" width="28" height="12" fill="#64748B"/>
-    <rect x="14" y="38" width="30" height="4"  fill="#64748B"/>
-    <rect x="16" y="52" width="24" height="2"  fill="#4A5568"/>
-    <!-- Upper body / wing -->
-    <rect x="16" y="24" width="30" height="18" fill="#C0C9D9"/>
-    <rect x="20" y="27" width="4"  height="2"  fill="#9EAAC0"/>
-    <rect x="27" y="26" width="5"  height="2"  fill="#9EAAC0"/>
-    <rect x="34" y="28" width="4"  height="2"  fill="#9EAAC0"/>
-    <rect x="22" y="31" width="5"  height="2"  fill="#9EAAC0"/>
-    <rect x="30" y="32" width="4"  height="2"  fill="#9EAAC0"/>
-    <rect x="38" y="30" width="3"  height="2"  fill="#9EAAC0"/>
-    <!-- Wing bars -->
-    <rect x="16" y="34" width="30" height="2"  fill="#364150"/>
-    <rect x="16" y="38" width="28" height="2"  fill="#364150"/>
-    <!-- Iridescent neck — teal -->
-    <rect x="24" y="18" width="14" height="4"  fill="#2F9E8F"/>
-    <rect x="22" y="20" width="16" height="3"  fill="#2F9E8F"/>
-    <!-- Iridescent neck — purple -->
-    <rect x="26" y="17" width="8"  height="3"  fill="#5E4070"/>
-    <rect x="24" y="19" width="4"  height="2"  fill="#5E4070"/>
-    <rect x="32" y="19" width="4"  height="2"  fill="#5E4070"/>
-    <!-- Neck base -->
-    <rect x="22" y="22" width="16" height="4"  fill="#4A5D7A"/>
-    <!-- Head -->
-    <rect x="26" y="8"  width="16" height="4"  fill="#4A5D7A"/>
-    <rect x="24" y="10" width="18" height="4"  fill="#4A5D7A"/>
-    <rect x="24" y="12" width="18" height="6"  fill="#4A5D7A"/>
-    <rect x="26" y="16" width="16" height="2"  fill="#4A5D7A"/>
-    <rect x="30" y="9"  width="6"  height="2"  fill="#5B6E8A"/>
-    <!-- Eye -->
-    <rect x="36" y="12" width="5"  height="5"  fill="#111"/>
-    <rect x="37" y="13" width="3"  height="3"  fill="#EEA14F"/>
-    <rect x="38" y="13" width="2"  height="2"  fill="#F4B95F"/>
-    <rect x="38" y="14" width="2"  height="2"  fill="#0a0a0a"/>
-    <rect x="38" y="13" width="1"  height="1"  fill="rgba(255,255,255,0.95)"/>
-    <!-- Beak -->
-    <rect x="42" y="13" width="6"  height="2"  fill="#AEB8C6"/>
-    <rect x="44" y="15" width="4"  height="2"  fill="#AEB8C6"/>
-    <rect x="47" y="14" width="2"  height="2"  fill="#8E98A6"/>
-    <rect x="43" y="13" width="2"  height="1"  fill="#8E98A6"/>
-  </g>
-</svg>`;
+        <g id="p-tail">
+          <path d="M12 44h8v6h-8z" fill="#373D4D"/>
+          <path d="M10 48h10v4h-10z" fill="#1C1C21"/>
+        </g>
+
+        <g id="p-legs">
+          <path d="M34 54h2v4h-2zM42 54h2v4h-2z" fill="#A86E79"/>
+          <path d="M32 58h6v2h-6zM40 58h6v2h-6z" fill="#1C1C21"/>
+        </g>
+
+        <g class="p-body-group">
+          <path d="M28 32h20v24H28z" fill="#1C1C21"/>
+          <path d="M30 34h16v20H30z" fill="#7A8296"/>
+          <path d="M30 48h16v6H30z" fill="#5D647A"/>
+          <path d="M32 34h4v4h-4zM38 34h4v4h-4z" fill="#98A0B3"/>
+
+          <g id="p-wing">
+            <path d="M22 38h18v16h-18z" fill="#1C1C21"/>
+            <path d="M24 40h14v12H24z" fill="#98A0B3"/>
+            <path d="M24 46h14v2H24z" fill="#4A5166"/>
+            <path d="M24 50h12v2H24z" fill="#373D4D"/>
+          </g>
+        </g>
+
+        <g class="p-head-unit">
+          <path d="M38 24h12v10H38z" fill="#1C1C21"/>
+          <path d="M40 26h8v6H40z" fill="#7A8296"/>
+          <path d="M40 27h8v2H40z" fill="#7EA8A6" opacity="0.6"/>
+
+          <path d="M42 10h16v16H42z" fill="#1C1C21"/>
+          <path d="M44 12h12v12H44z" fill="#7A8296"/>
+          <path d="M44 12h6v6h-6z" fill="#98A0B3"/> <rect x="52" y="16" width="2" height="2" fill="#1C1C21"/>
+          <rect x="53" y="16" width="1" height="1" fill="#fff"/>
+
+          <g id="p-visor-group">
+            <rect x="50" y="14" width="10" height="8" fill="#1C1C21"/>
+            <rect class="mascot-visor" x="51" y="15" width="8" height="6" fill="#72d6ff"/>
+            <rect x="52" y="15" width="4" height="2" fill="#B4E8FF" opacity="0.8"/>
+          </g>
+
+          <path d="M58 20h6v4h-6z" fill="#1C1C21"/>
+          <path d="M58 20h4v2h-4z" fill="#3B3B45"/>
+        </g>
+      </svg>`;
     }
 
-    // ── Slot creation ─────────────────────────────────────────────────────
     function getOrCreateSlot(s) {
       const area = document.getElementById('mascots-area');
       let slot = area.querySelector(`[data-id="${s.id}"]`);
       if (!slot) {
         slot = document.createElement('div');
-        slot.className = 'mascot-slot';
+        slot.className = `mascot-slot s-${s.status}`;
         slot.dataset.id = s.id;
         slot.innerHTML = `
-          <div class="hud-card">
-            <div class="agent-name">${(s.name || s.id).toUpperCase()}</div>
-            <div class="mascot-figure">
-              <div class="mascot-aura"></div>
-              ${buildPigeonSVG()}
-              <div class="speech-bubble">
-                <div class="speech-bubble-label">⚠ Permission needed</div>
-                <div class="speech-bubble-cmd"></div>
-              </div>
-            </div>
-            <div class="status-line">
-              <div class="status-dot"></div>
-              <div class="status-text"></div>
-            </div>
-            <div class="task-text"></div>
-            <div class="approval-btns">
-              <button class="abtn abtn-approve">✓ Allow</button>
-              <button class="abtn abtn-deny">✕ Deny</button>
-            </div>
+          <div class="approval-btns">
+            <button class="abtn abtn-deny">✕ DENY</button>
+            <button class="abtn abtn-approve">✓ ALLOW</button>
           </div>
+          <div class="thought-bubble">
+            <span class="bubble-text">ALLOW ACCESS?</span>
+            <span class="bubble-task">${s.task || 'SECURE CONNECT'}</span>
+          </div>
+          <div class="mascot-figure">${buildPigeonSVG()}</div>
+          <div class="agent-name">${s.name || s.id}</div>
         `;
-        slot.querySelector('.abtn-approve').onclick = e => { e.stopPropagation(); doAction(s.id, 'approve'); };
-        slot.querySelector('.abtn-deny').onclick    = e => { e.stopPropagation(); doAction(s.id, 'deny'); };
+        slot.querySelector('.abtn-deny').addEventListener('click', () => sendAction(s.id, 'deny'));
+        slot.querySelector('.abtn-approve').addEventListener('click', () => sendAction(s.id, 'approve'));
+        startAnimations(slot);
         area.appendChild(slot);
       }
       return slot;
     }
 
-    function updateSlot(slot, s) {
-      const sc = statusClass(s.status);
-      const wasHidden = slot.classList.contains('hidden');
-      slot.className = `mascot-slot ${sc}${wasHidden ? ' hidden' : ''}`;
-
-      slot.querySelector('.agent-name').textContent   = (s.name || s.id).toUpperCase();
-      slot.querySelector('.status-text').textContent  = STATUS_LABELS[s.status] || s.status;
-      slot.querySelector('.task-text').textContent    = (s.status !== 'idle' && s.status !== 'needs_approval') ? (s.task || '') : '';
-      slot.querySelector('.speech-bubble-cmd').textContent = s.task || '';
-
-      if (openLog === s.id) {
-        document.querySelector('#log-popover .popover-title').textContent = (s.name || s.id).toUpperCase();
-        document.querySelector('#log-popover .popover-task').textContent  = s.task || '';
-        renderLogFeed();
-      }
-
-      if (s.status === 'idle') {
-        scheduleHide(s.id, s.timestamp || Date.now());
-      } else {
-        showSlot(s.id);
-      }
-    }
-
-    function statusClass(st) {
-      return { idle:'s-idle', thinking:'s-thinking', working:'s-working',
-               needs_approval:'s-approval', success:'s-success',
-               error:'s-error', warning:'s-warning' }[st] || 's-idle';
-    }
-
-    // ── Log popover ───────────────────────────────────────────────────────
-    function toggleLog(id, slot) {
-      if (openLog === id) { closeLog(); return; }
-      if (openLog) closeLog();
-      openLog = id;
-
-      const popover = document.getElementById('log-popover');
-      const card    = slot.querySelector('.hud-card');
-      const rect    = card.getBoundingClientRect();
-      const pw = 280, margin = 10;
-
-      let left = rect.left + rect.width / 2 - pw / 2;
-      left = Math.max(margin, Math.min(left, window.innerWidth - pw - margin));
-
-      const aboveRoom = rect.top - 10;
-      if (aboveRoom > 240) {
-        popover.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
-        popover.style.top    = 'auto';
-      } else {
-        popover.style.top    = (rect.bottom + 8) + 'px';
-        popover.style.bottom = 'auto';
-      }
-      popover.style.left = left + 'px';
-
-      const s = sessions[id] || {};
-      popover.querySelector('.popover-title').textContent = (s.name || id).toUpperCase();
-      popover.querySelector('.popover-task').textContent  = s.task || '';
-      renderLogFeed();
-      popover.classList.add('open');
-    }
-
-    function closeLog() {
-      document.getElementById('log-popover').classList.remove('open');
-      openLog = null;
-    }
-
-    function renderLogFeed() {
-      const feed = document.getElementById('log-feed');
-      const entries = history.slice(-40).reverse();
-      if (!entries.length) {
-        feed.innerHTML = '<div class="log-empty">No pecks yet</div>';
-        return;
-      }
-      feed.innerHTML = '';
-      entries.forEach(h => {
-        const row = document.createElement('div');
-        row.className = `log-row ls-${h.status}`;
-        row.innerHTML = `
-          <div class="log-dot"></div>
-          <div class="log-text"><strong>${h.name || h.id}</strong> ${h.task || ''}</div>
-          <div class="log-time">${h.time || ''}</div>
-        `;
-        feed.appendChild(row);
-      });
-    }
-
-    // ── Auto-hide ─────────────────────────────────────────────────────────
-    function scheduleHide(id, timestamp) {
-      if (hideTimers[id]) clearTimeout(hideTimers[id]);
-      const remaining = IDLE_TIMEOUT - (Date.now() - timestamp);
-      if (remaining <= 0) { hideSlot(id); return; }
-      hideTimers[id] = setTimeout(() => hideSlot(id), remaining);
-    }
-    function hideSlot(id) {
-      const slot = document.querySelector(`[data-id="${id}"]`);
-      if (slot) slot.classList.add('hidden');
-      if (openLog === id) closeLog();
-    }
-    function showSlot(id) {
-      if (hideTimers[id]) clearTimeout(hideTimers[id]);
-      const slot = document.querySelector(`[data-id="${id}"]`);
-      if (slot) slot.classList.remove('hidden');
-    }
-
-    // ── Render sessions ───────────────────────────────────────────────────
-    function renderSessions(newSessions) {
-      const area = document.getElementById('mascots-area');
-      const ids  = new Set(Object.keys(newSessions));
-      area.querySelectorAll('[data-id]').forEach(el => { if (!ids.has(el.dataset.id)) el.remove(); });
-      Object.values(newSessions).forEach(s => updateSlot(getOrCreateSlot(s), s));
-    }
-
-    // ── SSE ───────────────────────────────────────────────────────────────
-    function connectSSE() {
-      if (eventSource) eventSource.close();
-      eventSource = new EventSource('http://localhost:49152/stream');
-      eventSource.addEventListener('update', e => {
-        try {
-          const data = JSON.parse(e.data);
-          sessions = data.sessions || {};
-          history  = data.history  || [];
-          renderSessions(sessions);
-        } catch(_) {}
-      });
-      eventSource.onerror = () => { eventSource.close(); setTimeout(connectSSE, 5000); };
-    }
-
-    async function doAction(id, type) {
-      await fetch('http://localhost:49152/action', {
+    function sendAction(id, action) {
+      fetch('http://localhost:49152/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, action: type })
+        body: JSON.stringify({ id, action })
+      }).catch(err => console.error('[Sentinel] action failed:', err));
+    }
+
+    function updateSlot(slot, s) {
+      slot.className = `mascot-slot s-${s.status}`;
+      const visor = slot.querySelector('.mascot-visor');
+      if (visor) visor.setAttribute('fill', VISOR_COLORS[s.status] || VISOR_COLORS.idle);
+      const bubbleTask = slot.querySelector('.bubble-task');
+      if (bubbleTask) bubbleTask.textContent = s.task || 'SECURE CONNECT';
+      const agentName = slot.querySelector('.agent-name');
+      if (agentName) agentName.textContent = s.name || s.id;
+      handleStateSync(slot, s.status);
+    }
+
+    function handleStateSync(slot, status) {
+      const head = slot.querySelector('.p-head-unit');
+      head.getAnimations().forEach(a => { if(a.id !== 'idle') a.cancel() });
+
+      if (status === 'working' || status === 'needs_approval') {
+        const speed = status === 'needs_approval' ? 400 : 700;
+        const bob = head.animate([
+          { transform: 'translateY(0) rotate(0deg)' },
+          { transform: `translateY(${status === 'needs_approval' ? '5px' : '3px'}) rotate(2deg)`, offset: 0.5 },
+          { transform: 'translateY(0) rotate(0deg)' }
+        ], { duration: speed, iterations: Infinity, easing: 'ease-in-out' });
+        bob.id = 'active-anim';
+      }
+    }
+
+    function startAnimations(slot) {
+      const body = slot.querySelector('.p-body-group');
+      const head = slot.querySelector('.p-head-unit');
+
+      // Breathing
+      body.animate([
+        { transform: 'scaleY(1)' },
+        { transform: 'scaleY(0.97)', offset: 0.5 },
+        { transform: 'scaleY(1)' }
+      ], { duration: 3000, iterations: Infinity, easing: 'ease-in-out' });
+
+      // Subtle Head Idle Swivel
+      const idleMood = () => {
+        setTimeout(() => {
+          if (!head.getAnimations().some(a => a.id === 'active-anim')) {
+            head.animate([
+              { transform: 'rotate(0)' },
+              { transform: 'rotate(-5deg)', offset: 0.5 },
+              { transform: 'rotate(0)' }
+            ], { duration: 1500, easing: 'ease-in-out' });
+          }
+          idleMood();
+        }, 4000 + Math.random() * 5000);
+      };
+      idleMood();
+    }
+
+    function renderSessions(sessions) {
+      const all = Object.values(sessions);
+      const hasNonMain = all.some(s => s.id !== 'main');
+      all.forEach(s => {
+        // Hide main entirely when any other session exists
+        if (s.id === 'main' && hasNonMain) {
+          const existing = document.querySelector(`[data-id="${s.id}"]`);
+          if (existing) existing.remove();
+          return;
+        }
+        const slot = getOrCreateSlot(s);
+        updateSlot(slot, s);
+      });
+      // Remove slots for sessions that no longer exist
+      document.querySelectorAll('#mascots-area [data-id]').forEach(slot => {
+        if (!sessions[slot.dataset.id]) slot.remove();
       });
     }
 
-    // ── Tap detection (everything is pointer-events:none except buttons) ──
-    let _tapX = 0, _tapY = 0, _tapTime = 0;
-    document.addEventListener('mousedown', e => { _tapX = e.clientX; _tapY = e.clientY; _tapTime = Date.now(); });
-    document.addEventListener('mouseup', e => {
-      if (Date.now() - _tapTime > 400 || Math.hypot(e.clientX - _tapX, e.clientY - _tapY) > 10) return;
-
-      const popover = document.getElementById('log-popover');
-      if (popover.classList.contains('open')) {
-        const r = popover.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return;
-      }
-
-      for (const slot of document.querySelectorAll('.mascot-slot:not(.hidden)')) {
-        const r = slot.querySelector('.hud-card').getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-          toggleLog(slot.dataset.id, slot); return;
-        }
-      }
-      if (openLog) closeLog();
+    // Connect to SSE stream
+    const evtSource = new EventSource('http://localhost:49152/stream');
+    evtSource.addEventListener('update', e => {
+      const data = JSON.parse(e.data);
+      renderSessions(data.sessions || {});
     });
-
-    connectSSE();
+    evtSource.onerror = () => console.warn('[Sentinel] SSE disconnected, will retry...');
   </script>
 </body>
 </html>

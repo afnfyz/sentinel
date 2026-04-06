@@ -57,22 +57,29 @@ Sessions auto-clear after 4 seconds on `success`, `error`, or `warning`. Non-`ma
 
 ## Approval Flow
 
-Only destructive tools trigger approval (write, edit, shell, delete, execute). When triggered:
-1. Mascot card switches to `needs_approval` with OK/NO buttons
-2. Terminal prints `[tool_name] Approve? [Y/n]:`
-3. Whichever responds first (mascot click or terminal keypress) wins
-4. After 30s with no response, auto-approves
+Two approval surfaces, never both at once:
 
-The hook scripts that implement this are `install/sentinel-before-tool.sh` (Gemini) and `install/sentinel-pre-tool.sh` (Claude Code). They are installed to `~/.gemini/hooks/` and `~/.claude/hooks/` respectively.
+- **VS Code focused** — hook passes through immediately (`{"decision":"allow"}`), Claude Code's own chat panel handles the approval prompt. No mascot involved.
+- **VS Code not focused** — hook blocks, posts `needs_approval` to Sentinel, and long-polls `/wait-approval`. The mascot is the sole approval surface. After 30s with no response, auto-approves.
+
+The hook detects which app is frontmost via `osascript` at call time. Approval buttons (DENY / ALLOW) and a speech bubble float above the pigeon mascot in the UI. Clicking either resolves the long-poll immediately.
+
+The hook script is `install/sentinel-pre-tool.sh` (Claude Code), installed to `~/.claude/hooks/`. The safe-command list is hardcoded in the hook — commands not on the list trigger mascot approval. `settings.json` has `Bash(**)` so Claude Code never shows its own dialog when the hook already allows something.
 
 ## Architecture Notes
 
 - State is persisted to `state.json` on every update and reloaded on server start. Stale sessions from previous runs are cleaned up by the auto-clear timers.
 - The Swift app uses `hidesOnDeactivate = false` and `alphaValue = 1.0` to stay fully visible regardless of which app has focus.
-- The Swift app intentionally does NOT call `NSApp.activate` on launch or during normal operation — it only steals focus when a session enters `needs_approval` status. This prevents the mascot from interrupting the user's active window.
+- When `needs_approval` is detected, the Swift app calls `window.orderFrontRegardless()` at `.screenSaver` level — this brings the mascot above all windows without stealing keyboard focus from the user's active app. `NSApp.activate` is intentionally NOT called to avoid yanking focus to VSCode (which caused a perceived double-approval).
 - The mascot figure uses `-webkit-app-region: drag` so the whole mascot can be dragged to reposition. Tap detection uses `mousedown`/`mouseup` distance check (< 6px) since WKWebView swallows `click` events on drag regions.
-- The log popover is a single shared `position: fixed` element positioned by JS (`getBoundingClientRect`) so it never gets clipped by the window bounds.
 - The `.app` bundle has `LSUIElement = true` in `Info.plist` so `open` launches it with no Dock icon and no terminal window.
 - The Swift app hardcodes the HTML path to `/Users/afnan_dfx/projects/gemini-sentinel/index.html` — changing the project location requires updating `Sentinel.swift` and recompiling.
 - Gemini CLI only runs hooks from project-level `.gemini/settings.json` (not user-level `~/.gemini/settings.json`). The extension approach bypasses this limitation.
 - `POST /session-end` returning `{ shutdown: true }` is the signal for the hook to also kill the mascot process.
+- All Claude Code hooks use the fixed session ID `"claude"` so `UserPromptSubmit`, `PreToolUse`, and `Stop` all update the same single pigeon mascot.
+
+
+#Reset Sentinel
+pkill GeminiSentinel; open /Users/afnan_dfx/projects/gemini-sentinel/GeminiSentinel.app
+
+
