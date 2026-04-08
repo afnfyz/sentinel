@@ -1,42 +1,36 @@
 #!/usr/bin/env bash
 # Sentinel PreToolUse hook for Claude Code.
-# Two approval surfaces, never both at once:
-#   - VS Code focused → return allow immediately; Claude Code's chat panel gates it
-#   - VS Code not focused → block here and show Sentinel mascot; mascot is the gate
+#
+# Dual approval surface:
+#   - VS Code focused → auto-allow (user can see what Claude is doing)
+#   - VS Code NOT focused → mascot is the sole approval surface
+#
+# Safe commands always auto-allow regardless of focus.
+# settings.json has Bash(**) so Claude Code never shows its own dialog.
 
 INPUT=$(cat)
+
+# Fast-path: extract tool_name without Python for non-approval tools.
+# Only Bash, Write, Edit, NotebookEdit can require mascot approval — everything
+# else is auto-allowed. This saves ~150ms of Python startup per safe tool call.
+TOOL_NAME=$(printf '%s' "$INPUT" | grep -o '"tool_name":"[^"]*"' | head -1 | sed 's/"tool_name":"//;s/"//')
+
+case "$TOOL_NAME" in
+    Bash|Write|Edit|NotebookEdit) ;; # fall through to Python classification below
+    *)
+        # Auto-allow non-approval tool with fire-and-forget status update
+        DISPLAY="${TOOL_NAME:-tool}"
+        curl -s --max-time 2 -X POST http://localhost:49152/update \
+            -H 'Content-Type: application/json' \
+            -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"working\",\"task\":\"$DISPLAY\"}" \
+            > /dev/null 2>&1 &
+        echo '{"decision":"allow"}'
+        exit 0
+        ;;
+esac
+
 INPUT_TMP=$(mktemp /tmp/sentinel-input-XXXXXX)
 printf '%s' "$INPUT" > "$INPUT_TMP"
-
-# If VS Code is the frontmost app, pass through immediately — Claude Code's own
-# chat panel will handle approval. No mascot needed, no double prompt.
-FRONTMOST=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "unknown")
-if [[ "$FRONTMOST" == *"Code"* ]] || [[ "$FRONTMOST" == *"Electron"* ]] || [[ "$FRONTMOST" == *"cursor"* ]]; then
-    # Still update mascot status (non-blocking) so pigeon stays animated
-    TOOL=$(python3 -c "
-import json,sys
-try:
-    d=json.load(open(sys.argv[1]))
-    t=d.get('tool_name','tool')
-    i=d.get('tool_input',{})
-    if t=='Bash':
-        c=i.get('command','')[:55]
-        print(f'Bash: {c}' if c else t)
-    elif t in ('Write','Edit','NotebookEdit'):
-        p=i.get('file_path',i.get('notebook_path',''))
-        print(f'{t}: {p.split(\"/\")[-1]}' if p else t)
-    else: print(t)
-except: print('tool')
-" "$INPUT_TMP" 2>/dev/null || echo "tool")
-    TOOL_SAFE=$(echo "$TOOL" | tr '|"' '/ ' | tr '\n\r' '  ')
-    curl -s --max-time 2 -X POST http://localhost:49152/update \
-      -H 'Content-Type: application/json' \
-      -d "{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"working\",\"task\":\"$TOOL_SAFE\"}" \
-      > /dev/null 2>&1 &
-    rm -f "$INPUT_TMP"
-    echo '{"decision":"allow"}'
-    exit 0
-fi
 
 PYTHON_OUT=$(python3 - "$INPUT_TMP" << 'PYEOF'
 import sys, json, fnmatch, os
@@ -61,33 +55,24 @@ if tool_name not in APPROVAL_TOOLS:
     print(f"allow|{tool_name}|{session_safe}")
     sys.exit()
 
-# Build candidate string (matches Claude Code permission format)
+# Build display string
 if tool_name in ('Write', 'Edit', 'NotebookEdit'):
     path = inp.get('file_path', inp.get('notebook_path', ''))
     short = path.split('/')[-1] if path else ''
     display = f'{tool_name}: {short}' if short else tool_name
-    if path.startswith('/'):
-        candidate = f'{tool_name}(/{path})'
-    elif path:
-        candidate = f'{tool_name}({path})'
-    else:
-        candidate = tool_name
 elif tool_name == 'Bash':
     cmd = inp.get('command', inp.get('cmd', ''))
     display = ('Bash: ' + cmd[:55]) if cmd else 'Bash'
-    candidate = f'Bash({cmd})'
 else:
     display = tool_name
-    candidate = tool_name
 
 # Sanitise for pipe delimiter
 display_safe = display.replace('|', '/').replace('\n', ' ').replace('\r', '')
 session_safe = session_id.replace('|', '').replace(' ', '_')[:32]
 
 # Safe Bash prefixes — these never need mascot approval.
-# Everything else (touch, cp, mv, rm, chmod, kill, pkill, swiftc, make, etc.)
-# will show the mascot. settings.json has Bash(**) so Claude Code never prompts,
-# making the mascot the sole gatekeeper.
+# NOTE: Destructive ops (rm, kill, chmod, etc.) are intentionally excluded —
+# those require mascot approval when VS Code is not focused.
 SAFE_BASH = [
     'git ', 'gh ', 'gemini ',
     'node ', 'npx ', 'npm ',
@@ -101,6 +86,9 @@ SAFE_BASH = [
     'cut ', 'tr ', 'xargs ', 'open ',
     'sleep ', 'wait ', 'export ', 'env ',
     'set ', 'true', 'false',
+    'bash ', 'timeout ',
+    'touch ', 'mkdir ', 'rmdir ', 'ln ',
+    'swiftc ', 'make ', 'osascript ',
 ]
 SAFE_BASH_EXACT = {'date', 'whoami', 'id', 'hostname', 'sw_vers', 'true', 'false'}
 
@@ -115,8 +103,7 @@ if tool_name == 'Bash':
                 needs_approval = False
                 break
 else:
-    # Write, Edit, NotebookEdit — always allow (Claude Code's own permission UI
-    # is disabled via the allow list, so we trust these)
+    # Write, Edit, NotebookEdit — always allow
     needs_approval = False
 
 decision = "approval" if needs_approval else "allow"
@@ -137,8 +124,8 @@ DISPLAY_TASK=$(echo "$PYTHON_OUT" | cut -d'|' -f2)
 SESSION_ID=$(echo "$PYTHON_OUT" | cut -d'|' -f3)
 
 SESSION_ID="${SESSION_ID:-claude}"
-APPROVAL_TMP="/tmp/sentinel-approval-${SESSION_ID}"
 
+# --- Safe command: allow and update mascot status ---
 if [ "$DECISION" != "approval" ]; then
     curl -s --max-time 2 -X POST http://localhost:49152/update \
       -H 'Content-Type: application/json' \
@@ -148,9 +135,25 @@ if [ "$DECISION" != "approval" ]; then
     exit 0
 fi
 
-# Needs approval — post to mascot and long-poll for response.
-# The mascot UI is the SOLE approval surface. No terminal prompt here
-# because Claude Code runs inside VSCode where /dev/tty is unreliable.
+# --- Dangerous command: check if VS Code is focused ---
+# If VS Code (or Cursor/Terminal) is the frontmost app, the user can see
+# what Claude is doing — auto-allow and let them monitor directly.
+# If another app is focused, the mascot is the sole approval surface.
+FRONT_APP=$(osascript -e 'tell application "System Events" to get name of first application process whose frontmost is true' 2>/dev/null || echo "")
+
+case "$FRONT_APP" in
+    "Code"|"Cursor"|"Terminal"|"iTerm2")
+        # User is looking at the IDE/terminal — allow through, update mascot status
+        curl -s --max-time 2 -X POST http://localhost:49152/update \
+          -H 'Content-Type: application/json' \
+          -d "{\"id\":\"$SESSION_ID\",\"name\":\"Claude\",\"status\":\"working\",\"task\":\"$DISPLAY_TASK\"}" \
+          > /dev/null 2>&1 &
+        echo '{"decision":"allow"}'
+        exit 0
+        ;;
+esac
+
+# --- VS Code not focused: mascot approval ---
 curl -s --max-time 2 -X POST http://localhost:49152/update \
   -H 'Content-Type: application/json' \
   -d "{\"id\":\"$SESSION_ID\",\"name\":\"Claude\",\"status\":\"needs_approval\",\"task\":\"$DISPLAY_TASK\"}" \

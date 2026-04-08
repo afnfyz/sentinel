@@ -21,6 +21,7 @@
       bottom: 10px;
       left: 50%;
       transform: translateX(-50%);
+      overflow: visible;
     }
 
     /* ===== PIGEON — always at the same spot ===== */
@@ -43,7 +44,7 @@
     .agent-name {
       font-family: 'Space Mono', monospace;
       font-size: 9px;
-      color: rgba(255,255,255,0.4);
+      color: var(--name-color, rgba(255,255,255,0.4));
       text-align: center;
       margin-top: 4px;
       letter-spacing: 0.15em;
@@ -59,7 +60,7 @@
       transform: translateX(-50%);
       width: 260px;
       height: 230px;
-      z-index: 5;
+      z-index: 10;
     }
     .s-needs_approval .thought-bubble { display: block; }
 
@@ -80,7 +81,7 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      z-index: 2;
+      z-index: 12;
     }
 
     /* "ALLOW ACCESS?" SVG text */
@@ -136,6 +137,7 @@
       padding: 0;
       transition: transform 80ms;
       user-select: none;
+      pointer-events: auto;
     }
     .abtn:active { transform: scale(0.88); }
     .abtn img {
@@ -155,7 +157,7 @@
     const VISOR_COLORS = {
       idle:           '#72d6ff',
       thinking:       '#7830DC',
-      working:        '#58C4F0',
+      working:        '#F5A623',
       needs_approval: '#D71921',
       success:        '#2FDFB0',
       error:          '#FF4455',
@@ -238,7 +240,7 @@
     }
 
     function sendAction(id, action) {
-      fetch('http://localhost:49152/action', {
+      fetch('/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, action })
@@ -259,7 +261,16 @@
     function handleStateSync(slot, status) {
       const head = slot.querySelector('.p-head-unit');
       head.getAnimations().forEach(a => { if(a.id !== 'idle') a.cancel() });
-      if (status === 'working' || status === 'needs_approval') {
+
+      if (status === 'thinking') {
+        // Gentle pulse — distinct from working bob, signals model is processing
+        const think = head.animate([
+          { transform: 'rotate(0) scale(1)' },
+          { transform: 'rotate(-2deg) scale(1.02)', offset: 0.5 },
+          { transform: 'rotate(0) scale(1)' }
+        ], { duration: 1200, iterations: Infinity, easing: 'ease-in-out' });
+        think.id = 'active-anim';
+      } else if (status === 'working' || status === 'needs_approval') {
         const speed = status === 'needs_approval' ? 400 : 700;
         const bob = head.animate([
           { transform: 'translateY(0) rotate(0deg)' },
@@ -308,14 +319,48 @@
       document.querySelectorAll('#mascots-area [data-id]').forEach(slot => {
         if (!sessions[slot.dataset.id]) slot.remove();
       });
+      // Notify Swift layer about approval state (eliminates 3s polling timer)
+      const anyApproval = all.some(s => s.status === 'needs_approval');
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.sentinel) {
+        window.webkit.messageHandlers.sentinel.postMessage({ needsApproval: anyApproval });
+      }
     }
 
-    const evtSource = new EventSource('http://localhost:49152/stream');
-    evtSource.addEventListener('update', e => {
-      const data = JSON.parse(e.data);
-      renderSessions(data.sessions || {});
-    });
-    evtSource.onerror = () => console.warn('[Sentinel] SSE disconnected, will retry...');
+    // --- Connection strategy ---
+    // SSE for real-time updates + polling fallback every 2s.
+    // WKWebView's EventSource can silently die on file:// origins,
+    // so the poll ensures the UI always reflects current state.
+
+    let evtSource;
+    let sseAlive = false;
+
+    function connectSSE() {
+      if (evtSource) { try { evtSource.close(); } catch(e) {} }
+      sseAlive = false;
+      evtSource = new EventSource('/stream');
+      evtSource.addEventListener('update', e => {
+        sseAlive = true;
+        const data = JSON.parse(e.data);
+        renderSessions(data.sessions || {});
+      });
+      evtSource.onerror = () => {
+        console.warn('[Sentinel] SSE error — polling will cover until reconnect');
+        sseAlive = false;
+      };
+    }
+    connectSSE();
+
+    // Polling fallback — always runs, ensures UI never goes stale
+    setInterval(() => {
+      fetch('/state')
+        .then(r => r.json())
+        .then(data => renderSessions(data.sessions || {}))
+        .catch(() => {});
+      // If SSE has been dead for a while, force reconnect
+      if (!sseAlive && evtSource && evtSource.readyState === EventSource.CLOSED) {
+        connectSSE();
+      }
+    }, 2000);
   </script>
 </body>
 </html>

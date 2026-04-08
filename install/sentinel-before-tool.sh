@@ -9,9 +9,10 @@ APPROVAL_TMP="/tmp/sentinel-approval-${SESSION_ID}"
 # Let read-only tools through immediately
 DESTRUCTIVE="write_file|replace|edit_file|run_shell_command|bash|delete|move|create|overwrite|execute|computer_use"
 if ! echo "$tool_name" | grep -qiE "$DESTRUCTIVE"; then
-  curl -s -X POST http://localhost:49152/update \
+  curl -s --max-time 2 -X POST http://localhost:49152/update \
     -H 'Content-Type: application/json' \
-    -d "{\"id\":\"$SESSION_ID\",\"name\":\"Gemini\",\"status\":\"working\",\"task\":\"Running: $tool_name\"}" > /dev/null
+    -d "{\"id\":\"$SESSION_ID\",\"name\":\"Gemini\",\"status\":\"working\",\"task\":\"Running: $tool_name\"}" \
+    > /dev/null 2>&1 &
   echo '{"decision":"allow"}'
   exit 0
 fi

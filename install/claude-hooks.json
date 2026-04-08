@@ -5,7 +5,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"success\",\"task\":\"Done\"}' > /dev/null &",
+          "command": "echo '{}' && curl -s --max-time 2 -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"success\",\"task\":\"Done\"}' > /dev/null &",
           "async": true
         }
       ]
@@ -17,8 +17,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "echo '{}' && curl -s -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"thinking\",\"task\":\"Thinking...\"}' > /dev/null &",
-          "async": true
+          "command": "curl -s --max-time 2 -X POST http://localhost:49152/update -H 'Content-Type: application/json' -d '{\"id\":\"claude\",\"name\":\"Claude\",\"status\":\"thinking\",\"task\":\"Thinking...\"}' > /dev/null && echo '{}'"
         }
       ]
     }
@@ -29,8 +28,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "~/.claude/hooks/sentinel-pre-tool.sh",
-          "async": true
+          "command": "~/.claude/hooks/sentinel-pre-tool.sh"
         }
       ]
     }

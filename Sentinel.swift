@@ -6,15 +6,15 @@ class SentinelWindow: NSWindow {
     override var canBecomeMain: Bool { return true }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKScriptMessageHandler {
     var window: SentinelWindow!
     var webView: WKWebView!
     var statusItem: NSStatusItem!
     var serverProcess: Process?
     var watchTimer: Timer?
+    var bgTimer: Timer?
     var dragStart: NSPoint?
     var _checkingServer = false
-    var _wasNeedsApproval = false   // tracks previous approval state to fire activate only once
 
     let sentinelDir: String = {
         let url = URL(fileURLWithPath: Bundle.main.bundlePath)
@@ -31,11 +31,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupWindow()
         setupDrag()
         startServerIfNeeded()
+        // Only check server liveness periodically — approval state
+        // is pushed from JS via WKScriptMessageHandler (instant, no polling)
         watchTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             DispatchQueue.global(qos: .background).async {
                 self?.startServerIfNeeded()
             }
-            self?.checkForApproval()
+        }
+        // Sample the screen behind the mascot to adapt text color
+        bgTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            self?.updateTextColorFromBackground()
         }
     }
 
@@ -133,16 +138,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         window.hidesOnDeactivate = false
 
         let config = WKWebViewConfiguration()
+        config.websiteDataStore = .nonPersistent()  // no caching — always load fresh HTML
+        // Register JS→Swift bridge for instant approval state notifications
+        config.userContentController.add(self, name: "sentinel")
         webView = WKWebView(frame: window.contentView!.bounds, configuration: config)
         webView.setValue(false, forKey: "drawsBackground")
         webView.autoresizingMask = [.width, .height]
         window.contentView?.addSubview(webView)
 
-        let htmlPath = "\(sentinelDir)/index.html"
-        webView.loadFileURL(
-            URL(fileURLWithPath: htmlPath),
-            allowingReadAccessTo: URL(fileURLWithPath: sentinelDir)
-        )
+        // Load from the Express server — avoids file:// CORS issues with
+        // EventSource and fetch to localhost. Falls back to file:// if server
+        // isn't ready yet (the 3s watchTimer will reload once it's up).
+        let serverURL = URL(string: "http://localhost:49152/index.html")!
+        webView.load(URLRequest(url: serverURL, cachePolicy: .reloadIgnoringLocalCacheData))
 
         window.orderFront(nil)
     }
@@ -222,26 +230,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
-    func checkForApproval() {
-        guard let url = URL(string: "http://localhost:49152/state") else { return }
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard let self = self,
-                  let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let sessions = json["sessions"] as? [String: Any] else { return }
-            let needsApproval = sessions.values.compactMap { $0 as? [String: Any] }
-                .contains { ($0["status"] as? String) == "needs_approval" }
-            DispatchQueue.main.async {
-                if needsApproval {
-                    self.window.level = .screenSaver
-                    self.window.orderFrontRegardless()
-                    self._wasNeedsApproval = true
-                } else {
-                    self.window.level = .floating
-                    self._wasNeedsApproval = false
-                }
+    // MARK: – Adaptive text color
+
+    func updateTextColorFromBackground() {
+        guard window.isVisible else { return }
+        // Use the system appearance (light/dark mode) — no screen capture permissions needed
+        let appearance = NSApp.effectiveAppearance
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let color = isDark ? "rgba(255,255,255,0.4)" : "rgba(0,0,0,0.55)"
+        webView.evaluateJavaScript("document.documentElement.style.setProperty('--name-color', '\(color)')")
+    }
+
+    // MARK: – WKScriptMessageHandler (JS→Swift bridge)
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any],
+              let needsApproval = body["needsApproval"] as? Bool else { return }
+        DispatchQueue.main.async {
+            if needsApproval {
+                self.window.level = .screenSaver
+                self.window.orderFrontRegardless()
+            } else {
+                self.window.level = .floating
             }
-        }.resume()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -250,6 +262,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ aNotification: Notification) {
         watchTimer?.invalidate()
+        bgTimer?.invalidate()
         serverProcess?.terminate()
         serverProcess?.waitUntilExit()  // flush state.json before exit
     }
